@@ -224,11 +224,9 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
   switch (section) {
     case "competitors":
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (raw?.competitors ?? []).map((c: any) => ({
         id: c.id,
         title: c.name ?? "Competitor",
@@ -245,7 +243,6 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
         created_at: c.created_at,
       }));
     case "drafts":
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (raw?.posts ?? []).map((p: any) => {
         const tags = p.engagement?.hashtags?.length
           ? `\n\n${p.engagement.hashtags.join(" ")}`
@@ -263,7 +260,6 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
         };
       });
     case "outreach":
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (raw?.campaigns ?? []).map((c: any) => ({
         id: c.id,
         title: c.name ?? "Email campaign",
@@ -281,7 +277,6 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
         created_at: c.created_at,
       }));
     case "ads":
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (raw?.campaigns ?? []).map((c: any) => ({
         id: c.id,
         title: c.name ?? "Ad campaign",
@@ -310,7 +305,6 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
           summary: String(raw.positioning),
           agent_type: "business_planning",
         });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (raw?.goals ?? []).forEach((g: any, i: number) =>
         items.push({
           id: `goal-${i}`,
@@ -345,7 +339,6 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
     case "build": {
       const key = section === "support" ? "drafts" : "specs";
       const at = section === "support" ? "customer_support" : "code_generation";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items: SectionItem[] = (raw?.[key] ?? []).map((d: any) => ({
         id: d.id,
         title: d.title ?? (section === "support" ? "Support note" : "Build spec"),
@@ -389,7 +382,6 @@ export const cytapi = {
 
   // Living-report topic surfaces — normalized from the backend's domain shapes.
   topicOverview: async (id: string): Promise<TopicOverview> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw: any = await client.get(`/topic/${id}/overview`);
     const plan = raw?.latest_plan ?? {};
     const items: SectionItem[] = [];
@@ -408,7 +400,6 @@ export const cytapi = {
         detail: JSON.stringify(plan, null, 2),
         agent_type: "business_planning",
       });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (raw?.company?.goals ?? []).forEach((g: any, i: number) =>
       items.push({
         id: `ov-goal-${i}`,
