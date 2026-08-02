@@ -19,7 +19,9 @@ export function SiteHeader() {
       </Link>
       <nav className="flex items-center gap-[18px] text-[13.5px] text-mut">
         <span className="cursor-default">How it works</span>
-        <span className="cursor-default">Pricing</span>
+        <Link href="/pricing" className="transition-colors hover:text-ink">
+          Pricing
+        </Link>
         <Link href="/signin" className="transition-colors hover:text-ink">
           Sign in
         </Link>
