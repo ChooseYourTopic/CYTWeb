@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/Skeleton";
-import type { TopicOverview } from "@/lib/api";
+import type { FinanceSummary, TopicOverview } from "@/lib/api";
 
 type Tile = {
   label: string;
@@ -15,17 +15,27 @@ type Tile = {
  */
 export function KpiTiles({
   overview,
+  finance,
   findings,
   loading,
 }: {
   overview: TopicOverview | null;
+  finance: FinanceSummary | null;
   findings: number;
   loading: boolean;
 }) {
   const k = overview?.kpis ?? {};
   const totalAgents = k.total_agents ?? 9;
-  const spend = k.spend_usd ?? 0;
-  const cap = k.spend_cap_usd;
+  // Prefer the REAL per-company AI spend from /finance/summary; fall back to
+  // the overview estimate only when the finance snapshot isn't available yet.
+  const spend =
+    finance?.ai_spend_cents != null
+      ? finance.ai_spend_cents / 100
+      : (k.spend_usd ?? 0);
+  const cap =
+    finance?.ai_spend_cap_cents != null
+      ? finance.ai_spend_cap_cents / 100
+      : k.spend_cap_usd;
 
   const tiles: Tile[] = [
     {

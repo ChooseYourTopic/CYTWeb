@@ -10,8 +10,14 @@ import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
 import { DraftsPanel } from "@/components/research/DraftsPanel";
 import { DecisionsPanel } from "@/components/research/DecisionsPanel";
 import { ReportArtifact } from "@/components/research/ReportArtifact";
+import { FinancePanel } from "@/components/research/FinancePanel";
+import { OutreachPanel } from "@/components/research/OutreachPanel";
+import { SupportPanel } from "@/components/research/SupportPanel";
+import { AdsPanel } from "@/components/research/AdsPanel";
+import { BuildPanel } from "@/components/research/BuildPanel";
 import { InvestigationRail } from "@/components/research/InvestigationRail";
 import { useSectionData } from "@/hooks/useSectionData";
+import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
@@ -36,6 +42,9 @@ export function ResearchDashboard({
     () => cytapi.topicOverview(topicId),
     20000,
   );
+
+  // Real per-company financials (incl. AI spend) for the spend KPI tile.
+  const { summary: finance } = useFinanceSummary();
 
   // Reset the tab to Overview whenever the topic changes.
   const setActive = useResearchStore((s) => s.setActiveSection);
@@ -85,6 +94,7 @@ export function ResearchDashboard({
 
       <KpiTiles
         overview={overview}
+        finance={finance}
         findings={Number(findings)}
         loading={loading}
       />
@@ -102,6 +112,11 @@ export function ResearchDashboard({
             )}
             {active === "market" && <MarketSignalsPanel topicId={topicId} />}
             {active === "drafts" && <DraftsPanel topicId={topicId} />}
+            {active === "outreach" && <OutreachPanel topicId={topicId} />}
+            {active === "support" && <SupportPanel topicId={topicId} />}
+            {active === "ads" && <AdsPanel topicId={topicId} />}
+            {active === "build" && <BuildPanel topicId={topicId} />}
+            {active === "finance" && <FinancePanel topicId={topicId} />}
             {active === "decisions" && <DecisionsPanel />}
             {active === "report" && <ReportArtifact />}
           </div>

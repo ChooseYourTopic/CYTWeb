@@ -94,6 +94,10 @@ export type FinanceSummary = {
   total_expenses_month_cents: number;
   stripe_balance_cents: number;
   last_snapshot_date: string | null;
+  // Additive: real per-company AI model spend + optional cap (backend now
+  // returns these). Cents-based to match the rest of the finance contract.
+  ai_spend_cents?: number;
+  ai_spend_cap_cents?: number;
 };
 
 /* ------------------- Living-report (topic) additive types ------------------ */
@@ -104,7 +108,25 @@ export type SectionKey =
   | "market"
   | "drafts"
   | "decisions"
-  | "report";
+  | "report"
+  // One tab per background agent so all 9 agents' output has a home.
+  | "finance"
+  | "outreach"
+  | "support"
+  | "ads"
+  | "build";
+
+// Sections fetched via GET /topic/{id}/{section} → SectionItem[].
+// (overview uses /overview, report uses /reports, decisions uses /tasks.)
+export type FetchableSection =
+  | "competitors"
+  | "market"
+  | "drafts"
+  | "finance"
+  | "outreach"
+  | "support"
+  | "ads"
+  | "build";
 
 // Progressive-disclosure item: collapsed summary → expandable detail.
 export type SectionItem = {
@@ -173,7 +195,7 @@ export const cytapi = {
   // Living-report topic surfaces (additive; fail-soft to placeholders).
   topicOverview: (id: string) =>
     client.get<TopicOverview>(`/topic/${id}/overview`),
-  section: (id: string, section: Exclude<SectionKey, "overview" | "report">) =>
+  section: (id: string, section: FetchableSection) =>
     client.get<SectionItem[]>(`/topic/${id}/${section}`),
 
   // Daily report artifacts.

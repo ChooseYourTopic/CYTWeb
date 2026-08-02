@@ -9,6 +9,11 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "competitors", label: "Competitors" },
   { key: "market", label: "Market" },
   { key: "drafts", label: "Drafts" },
+  { key: "outreach", label: "Outreach" },
+  { key: "support", label: "Support" },
+  { key: "ads", label: "Ads" },
+  { key: "build", label: "Build" },
+  { key: "finance", label: "Finance" },
   { key: "decisions", label: "Decisions" },
   { key: "report", label: "Report" },
 ];
