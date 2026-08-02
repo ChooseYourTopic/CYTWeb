@@ -85,8 +85,57 @@ export type AgentStatus = {
   agent_type: string;
   last_run_at: string | null;
   last_run_status: string | null;
+  last_action?: string | null;
   tasks_today: number;
   tasks_total: number;
+  tasks_pending?: number;
+  cost_usd?: number;
+};
+
+/** A single run in an agent's process log. */
+export type AgentRunInfo = {
+  id: number;
+  run_type: string;
+  status: string;
+  summary: string | null;
+  tokens_used: number | null;
+  cost_usd: number | null;
+  duration_secs: number | null;
+  started_at: string | null;
+};
+
+export type AgentQueueItem = {
+  id: number;
+  title: string;
+  status: string;
+  priority: number;
+  source: string;
+  result_summary: string | null;
+  created_at: string | null;
+};
+
+export type AgentAction = {
+  id: number;
+  action: string;
+  summary: string;
+  level: ActivityLevel;
+  created_at: string | null;
+};
+
+/** Everything the dashboard shows when you open an agent. */
+export type AgentDetail = {
+  agent_type: string;
+  role: string;
+  skills: string[];
+  stats: {
+    runs_total: number;
+    cost_usd: number;
+    tasks_total: number;
+    tasks_pending: number;
+  };
+  queue: AgentQueueItem[];
+  runs: AgentRunInfo[];
+  actions: AgentAction[];
 };
 
 export type FinanceSummary = {
@@ -373,6 +422,10 @@ export const cytapi = {
 
   // Agent status grid (polled by useAgentStatus).
   agentStatus: () => client.get<AgentStatus[]>("/agents/status"),
+
+  // Full working picture for one agent: skills, queue, process (runs), actions.
+  agentDetail: (agentType: string) =>
+    client.get<AgentDetail>(`/agents/${agentType}/detail`),
 
   // Tasks list (Decisions panel).
   tasks: (limit = 100) => client.get<Task[]>(`/tasks?limit=${limit}`),
