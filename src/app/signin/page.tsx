@@ -2,39 +2,70 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, MailCheck } from "lucide-react";
+import { ArrowRight, Smartphone, ShieldCheck } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { cytapi } from "@/lib/api";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Digits only; require a plausible phone length (7–15 per E.164). */
+function normalizePhone(raw: string): string {
+  return raw.replace(/[^\d+]/g, "");
+}
+function isValidPhone(raw: string): boolean {
+  const d = raw.replace(/\D/g, "");
+  return d.length >= 7 && d.length <= 15;
+}
 
 /**
- * Passwordless (magic-link) sign-in. Enter email → POST /auth/magic-link/request
- * → "check your inbox" state. Fail-soft: if the backend auth isn't live yet we
- * still advance to the sent state so the flow is fully reviewable.
+ * Phone-first, SMS-code sign-in. Two steps:
+ *   1) enter mobile number → POST /auth/sms/request → code texted
+ *   2) enter the 6-digit code → POST /auth/sms/verify → session
+ * Fail-soft: if the backend auth isn't live yet, the flow still advances so it
+ * can be reviewed end-to-end against the live UI.
  */
 export default function SignInPage() {
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState<"phone" | "code">("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  async function submit() {
-    const value = email.trim();
+  async function sendCode() {
+    const value = normalizePhone(phone);
     if (busy) return;
-    if (!EMAIL_RE.test(value)) {
-      setError("Enter a valid email address.");
+    if (!isValidPhone(value)) {
+      setError("Enter a valid mobile number (include country code).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      await cytapi.auth.requestSmsCode(value);
+      setNote("We texted a 6-digit code to your phone.");
+    } catch {
+      setNote("Auth backend isn't live yet — enter any 6 digits to preview.");
+    } finally {
+      setStep("code");
+      setBusy(false);
+    }
+  }
+
+  async function verify() {
+    if (busy) return;
+    if (!/^\d{6}$/.test(code)) {
+      setError("Enter the 6-digit code.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await cytapi.auth.requestMagicLink(value);
-      setSent(true);
+      await cytapi.auth.verifySmsCode(normalizePhone(phone), code);
+      setNote("Verified. Signing you in…");
+      // On a live backend the session cookie is set here; route into the app.
+      window.location.href = "/";
     } catch {
-      // Backend auth not up yet — still show the check-inbox state so the
-      // sign-in flow can be reviewed end-to-end against the live UI.
-      setSent(true);
+      setError("Couldn't verify — the auth backend isn't live yet.");
     } finally {
       setBusy(false);
     }
@@ -46,76 +77,131 @@ export default function SignInPage() {
 
       <section className="mx-auto mt-16 max-w-md">
         <div className="rounded-2xl border border-line bg-panel p-8 shadow-[0_20px_60px_-30px_#000]">
-          {!sent ? (
+          {step === "phone" ? (
             <>
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
+                <Smartphone size={20} className="text-brand" />
+              </div>
               <h1 className="text-[26px] font-bold tracking-[-0.5px]">Sign in</h1>
               <p className="mt-2 text-[14px] text-mut">
-                Enter your email and we&apos;ll send a one-time sign-in link. No
-                password to remember.
+                Enter your mobile number and we&apos;ll text you a one-time code.
+                No password to remember.
               </p>
 
               <label
-                htmlFor="email"
+                htmlFor="phone"
                 className="mt-6 block text-[12px] uppercase tracking-wider text-dim"
               >
-                Email
+                Mobile number
               </label>
               <input
-                id="email"
-                type="email"
-                autoComplete="email"
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 autoFocus
                 className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
-                placeholder="you@company.com"
-                value={email}
+                placeholder="+1 (555) 123-4567"
+                value={phone}
                 onChange={(e) => {
-                  setEmail(e.target.value);
+                  setPhone(e.target.value);
                   setError(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") submit();
+                  if (e.key === "Enter") sendCode();
                 }}
               />
               {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
 
               <button
-                onClick={submit}
+                onClick={sendCode}
                 disabled={busy}
                 className="cyt-gradient-bg mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-bg disabled:opacity-60"
               >
-                {busy ? "Sending…" : "Send sign-in link"}
+                {busy ? "Sending…" : "Text me a code"}
                 {!busy && <ArrowRight size={16} strokeWidth={2.5} />}
               </button>
 
               <p className="mt-4 text-center text-[12.5px] text-dim">
-                New here? The same link creates your account.
+                New here? The same code creates your account. Message &amp; data
+                rates may apply.
               </p>
             </>
           ) : (
-            <div className="text-center">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-line bg-panel2">
-                <MailCheck size={22} className="text-good" />
+            <>
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
+                <ShieldCheck size={20} className="text-good" />
               </div>
-              <h1 className="mt-4 text-[22px] font-bold tracking-[-0.4px]">
-                Check your inbox
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
+                Enter your code
               </h1>
               <p className="mt-2 text-[14px] text-mut">
-                If <span className="text-ink">{email}</span> matches an account,
-                a one-time sign-in link is on its way. It expires in 10 minutes.
+                {note ?? "We texted a 6-digit code to"}{" "}
+                <span className="text-ink">{phone}</span>.
               </p>
-              <button
-                onClick={() => setSent(false)}
-                className="mt-6 text-[13px] text-brand hover:underline"
+
+              <label
+                htmlFor="code"
+                className="mt-6 block text-[12px] uppercase tracking-wider text-dim"
               >
-                Use a different email
+                6-digit code
+              </label>
+              <input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-center text-[24px] font-semibold tracking-[0.5em] text-ink outline-none placeholder:tracking-normal placeholder:text-dim focus:border-[#31384c]"
+                placeholder="••••••"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") verify();
+                }}
+              />
+              {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
+
+              <button
+                onClick={verify}
+                disabled={busy}
+                className="cyt-gradient-bg mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-bg disabled:opacity-60"
+              >
+                {busy ? "Verifying…" : "Verify & sign in"}
+                {!busy && <ArrowRight size={16} strokeWidth={2.5} />}
               </button>
-            </div>
+
+              <div className="mt-4 flex items-center justify-between text-[13px]">
+                <button
+                  onClick={() => {
+                    setStep("phone");
+                    setCode("");
+                    setError(null);
+                    setNote(null);
+                  }}
+                  className="text-mut transition-colors hover:text-ink"
+                >
+                  ← Change number
+                </button>
+                <button
+                  onClick={sendCode}
+                  disabled={busy}
+                  className="text-brand hover:underline disabled:opacity-60"
+                >
+                  Resend code
+                </button>
+              </div>
+            </>
           )}
         </div>
 
         <p className="mx-auto mt-5 max-w-md text-center text-[12px] text-dim">
-          By continuing you agree to the {`ChooseYourTopic`} Terms and Privacy
-          Policy.
+          By continuing you agree to the ChooseYourTopic Terms and Privacy
+          Policy, and to receive a verification text.
         </p>
         <p className="mt-3 text-center text-[13px]">
           <Link href="/" className="text-mut transition-colors hover:text-ink">

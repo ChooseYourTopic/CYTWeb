@@ -184,12 +184,17 @@ export const cytapi = {
   activitySince: (sinceId: number) =>
     client.get<ActivityEvent[]>(`/activity?since=${sinceId}`),
 
-  // Passwordless (magic-link) auth. Fail-soft in the UI until CYTAPI ships these.
+  // Phone-first SMS-code auth. Fail-soft in the UI until CYTAPI ships these.
   auth: {
-    requestMagicLink: (email: string) =>
-      client.post<{ sent: boolean }>("/auth/magic-link/request", { email }),
+    requestSmsCode: (phone: string) =>
+      client.post<{ sent: boolean }>("/auth/sms/request", { phone }),
+    verifySmsCode: (phone: string, code: string) =>
+      client.post<{ authenticated: boolean }>("/auth/sms/verify", {
+        phone,
+        code,
+      }),
     session: () =>
-      client.get<{ authenticated: boolean; email?: string }>("/auth/session"),
+      client.get<{ authenticated: boolean; phone?: string }>("/auth/session"),
     logout: () => client.post<void>("/auth/logout"),
   },
 };
