@@ -1,22 +1,11 @@
 import { BRAND } from "@/lib/brand";
 import { TopicHeroInput } from "@/components/onboarding/TopicHeroInput";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export default function LandingPage() {
   return (
     <main className="mx-auto max-w-[1180px] px-6">
-      <header className="mb-2 mt-9 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-[19px] font-bold tracking-tight">
-          <div className="cyt-gradient-bg grid h-[30px] w-[30px] place-items-center rounded-[9px] font-extrabold text-bg">
-            {BRAND.MARK}
-          </div>
-          {BRAND.APP_NAME}
-        </div>
-        <nav className="flex gap-[18px] text-[13.5px] text-mut">
-          <span>How it works</span>
-          <span>Pricing</span>
-          <span>Sign in</span>
-        </nav>
-      </header>
+      <SiteHeader />
 
       <section className="pb-8 pt-16 text-center">
         <h1 className="mx-auto text-[46px] font-bold leading-[1.05] tracking-[-1.2px]">

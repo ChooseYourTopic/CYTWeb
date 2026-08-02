@@ -183,4 +183,13 @@ export const cytapi = {
   // Backfill activity events missed across a WS reconnect.
   activitySince: (sinceId: number) =>
     client.get<ActivityEvent[]>(`/activity?since=${sinceId}`),
+
+  // Passwordless (magic-link) auth. Fail-soft in the UI until CYTAPI ships these.
+  auth: {
+    requestMagicLink: (email: string) =>
+      client.post<{ sent: boolean }>("/auth/magic-link/request", { email }),
+    session: () =>
+      client.get<{ authenticated: boolean; email?: string }>("/auth/session"),
+    logout: () => client.post<void>("/auth/logout"),
+  },
 };
