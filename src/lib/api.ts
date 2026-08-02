@@ -145,6 +145,8 @@ export type SectionItem = {
   tag?: string;
   metrics?: { label: string; value: string }[];
   series?: { t: string; v: number }[];
+  // A steering action the user can take on this item (maps item.id → an endpoint).
+  action?: "publish" | "send" | "launch";
 };
 
 export type TopicOverview = {
@@ -212,6 +214,160 @@ export type MyTopicsResponse = {
   topics: MyTopic[];
 };
 
+/* --------------------------- Section normalizers --------------------------- */
+// The backend returns domain-shaped section payloads (e.g. { section, posts })
+// while the dashboard renders a flat SectionItem[]. These map one to the other
+// and attach the steering action (publish/send/launch) each item supports.
+
+function truncate(s: string, n: number): string {
+  s = (s ?? "").trim();
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
+  switch (section) {
+    case "competitors":
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (raw?.competitors ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.name ?? "Competitor",
+        summary: c.positioning ?? "Competitor profile",
+        detail: [
+          c.website ? `Website: ${c.website}` : null,
+          c.strengths?.length ? `Strengths: ${c.strengths.join(", ")}` : null,
+          c.weaknesses?.length ? `Weaknesses: ${c.weaknesses.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        agent_type: "competitor_research",
+        tag: "competitor",
+        created_at: c.created_at,
+      }));
+    case "drafts":
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (raw?.posts ?? []).map((p: any) => {
+        const tags = p.engagement?.hashtags?.length
+          ? `\n\n${p.engagement.hashtags.join(" ")}`
+          : "";
+        return {
+          id: p.id,
+          title: truncate(p.content ?? "Draft post", 64),
+          summary: p.content ?? "",
+          detail: `${p.content ?? ""}${tags}`,
+          status: p.status,
+          agent_type: "social_media",
+          tag: p.platform ?? "twitter",
+          action: p.status === "published" ? undefined : "publish",
+          created_at: p.created_at,
+        };
+      });
+    case "outreach":
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (raw?.campaigns ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.name ?? "Email campaign",
+        summary: c.goal ?? c.target_segment ?? "Outreach campaign",
+        detail: [
+          c.target_segment ? `Segment: ${c.target_segment}` : null,
+          `Emails sent: ${c.total_sent ?? 0}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        status: c.status,
+        agent_type: "email_outreach",
+        metrics: [{ label: "Sent", value: String(c.total_sent ?? 0) }],
+        action: c.status === "draft" ? "send" : undefined,
+        created_at: c.created_at,
+      }));
+    case "ads":
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (raw?.campaigns ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.name ?? "Ad campaign",
+        summary: `${c.goal ?? "campaign"} · $${c.daily_budget_usd ?? 0}/day on ${c.platform ?? "meta"}`,
+        detail: [
+          `Platform: ${c.platform ?? "—"}`,
+          `Goal: ${c.goal ?? "—"}`,
+          `Daily budget: $${c.daily_budget_usd ?? 0}`,
+          c.external_id ? `External id: ${c.external_id}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        status: c.status,
+        agent_type: "ads_management",
+        metrics: [{ label: "Budget", value: `$${c.daily_budget_usd ?? 0}/day` }],
+        action:
+          c.status === "planned" || c.status === "draft" ? "launch" : undefined,
+        created_at: c.created_at,
+      }));
+    case "market": {
+      const items: SectionItem[] = [];
+      if (raw?.positioning)
+        items.push({
+          id: "positioning",
+          title: "Positioning",
+          summary: String(raw.positioning),
+          agent_type: "business_planning",
+        });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (raw?.goals ?? []).forEach((g: any, i: number) =>
+        items.push({
+          id: `goal-${i}`,
+          title: "Goal",
+          summary: typeof g === "string" ? g : JSON.stringify(g),
+          agent_type: "business_planning",
+        }),
+      );
+      return items;
+    }
+    case "finance": {
+      const items: SectionItem[] = [
+        {
+          id: "ai-spend",
+          title: "AI spend",
+          summary: `$${raw?.ai_spend_usd ?? 0} on model calls — capped & sandboxed`,
+          status: raw?.revenue_status,
+          agent_type: "finance",
+        },
+      ];
+      if (raw?.analysis?.summary)
+        items.push({
+          id: "finance-analysis",
+          title: "Finance analysis",
+          summary: String(raw.analysis.summary),
+          detail: JSON.stringify(raw.analysis, null, 2),
+          agent_type: "finance",
+        });
+      return items;
+    }
+    case "support":
+    case "build": {
+      const key = section === "support" ? "drafts" : "specs";
+      const at = section === "support" ? "customer_support" : "code_generation";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items: SectionItem[] = (raw?.[key] ?? []).map((d: any) => ({
+        id: d.id,
+        title: d.title ?? (section === "support" ? "Support note" : "Build spec"),
+        summary: truncate(d.content ?? "", 140),
+        detail: d.content,
+        agent_type: at,
+        created_at: d.created_at,
+      }));
+      if (raw?.analysis?.summary)
+        items.unshift({
+          id: `${section}-analysis`,
+          title: section === "support" ? "Support summary" : "Build summary",
+          summary: String(raw.analysis.summary),
+          agent_type: at,
+        });
+      return items;
+    }
+    default:
+      return [];
+  }
+}
+
 /* ------------------------------ API surface ------------------------------- */
 
 export const cytapi = {
@@ -231,11 +387,50 @@ export const cytapi = {
   // Finance snapshot (spend / MRR tiles).
   financeSummary: () => client.get<FinanceSummary>("/finance/summary"),
 
-  // Living-report topic surfaces (additive; fail-soft to placeholders).
-  topicOverview: (id: string) =>
-    client.get<TopicOverview>(`/topic/${id}/overview`),
-  section: (id: string, section: FetchableSection) =>
-    client.get<SectionItem[]>(`/topic/${id}/${section}`),
+  // Living-report topic surfaces — normalized from the backend's domain shapes.
+  topicOverview: async (id: string): Promise<TopicOverview> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw: any = await client.get(`/topic/${id}/overview`);
+    const plan = raw?.latest_plan ?? {};
+    const items: SectionItem[] = [];
+    if (raw?.company?.value_prop)
+      items.push({
+        id: "value-prop",
+        title: "Value proposition",
+        summary: String(raw.company.value_prop),
+        agent_type: "orchestrator",
+      });
+    if (plan.summary)
+      items.push({
+        id: "plan",
+        title: "The plan",
+        summary: String(plan.summary),
+        detail: JSON.stringify(plan, null, 2),
+        agent_type: "business_planning",
+      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (raw?.company?.goals ?? []).forEach((g: any, i: number) =>
+      items.push({
+        id: `ov-goal-${i}`,
+        title: "Goal",
+        summary: typeof g === "string" ? g : JSON.stringify(g),
+        agent_type: "business_planning",
+      }),
+    );
+    return {
+      topic: raw?.company?.topic ?? "",
+      tagline: raw?.company?.value_prop,
+      exec_summary: plan.summary ?? raw?.company?.mission,
+      kpis: raw?.kpis ?? {},
+      spark: raw?.spark ?? [],
+      items,
+    };
+  },
+  section: async (
+    id: string,
+    section: FetchableSection,
+  ): Promise<SectionItem[]> =>
+    normalizeSection(section, await client.get(`/topic/${id}/${section}`)),
 
   // Daily report artifacts.
   reports: (limit = 20) => client.get<DailyReport[]>(`/reports?limit=${limit}`),

@@ -1,25 +1,70 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import type { SectionItem } from "@/lib/api";
+import { X, Send, Rocket, Megaphone } from "lucide-react";
+import { client, type SectionItem } from "@/lib/api";
 import { label } from "@/lib/utils";
+
+/** Steering actions: item.action → endpoint + button copy + icon. */
+const ACTIONS = {
+  publish: {
+    verb: "Publish",
+    pending: "Publishing…",
+    done: "Published ✓",
+    Icon: Send,
+    endpoint: (id: SectionItem["id"]) => `/social/posts/${id}/publish`,
+  },
+  send: {
+    verb: "Send",
+    pending: "Sending…",
+    done: "Sent ✓",
+    Icon: Megaphone,
+    endpoint: (id: SectionItem["id"]) => `/outreach/campaigns/${id}/send`,
+  },
+  launch: {
+    verb: "Launch",
+    pending: "Launching…",
+    done: "Launched ✓",
+    Icon: Rocket,
+    endpoint: (id: SectionItem["id"]) => `/ads/campaigns/${id}/launch`,
+  },
+} as const;
 
 /**
  * Progressive-disclosure primitive reused by every section: a collapsed
  * summary card that expands into a full reading view (modal dialog). Summary
- * first; detail on demand — never a wall of text.
+ * first; detail on demand — never a wall of text. When the item carries an
+ * `action`, it also renders a steering button (publish/send/launch) that POSTs
+ * to the backend with optimistic feedback.
  */
 export function ProgressiveCard({ item }: { item: SectionItem }) {
   const [open, setOpen] = useState(false);
+  const [actState, setActState] = useState<
+    "idle" | "pending" | "done" | "error"
+  >("idle");
   const hasDetail = Boolean(item.detail);
+  const act = item.action ? ACTIONS[item.action] : null;
+
+  async function runAction(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!act || actState === "pending" || actState === "done") return;
+    setActState("pending");
+    try {
+      await client.post(act.endpoint(item.id));
+      setActState("done");
+    } catch {
+      setActState("error");
+    }
+  }
 
   return (
     <>
-      <button
-        type="button"
+      <div
         onClick={() => hasDetail && setOpen(true)}
-        className="animate-rise block w-full rounded-[11px] border border-line bg-panel2 p-4 text-left transition-colors hover:border-[#31384c]"
+        className={
+          "animate-rise block w-full rounded-[11px] border border-line bg-panel2 p-4 text-left transition-colors hover:border-[#31384c]" +
+          (hasDetail ? " cursor-pointer" : "")
+        }
         data-testid="progressive-card"
       >
         <div className="flex items-start justify-between gap-3">
@@ -46,7 +91,33 @@ export function ProgressiveCard({ item }: { item: SectionItem }) {
             <span className="ml-auto text-[12px] text-dim">Expand →</span>
           )}
         </div>
-      </button>
+
+        {act && (
+          <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+            {actState === "done" ? (
+              <span className="text-[13px] font-medium text-good">
+                {act.done}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={runAction}
+                disabled={actState === "pending"}
+                className="flex items-center gap-1.5 rounded-lg border border-[#223257] bg-brand/10 px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
+              >
+                <act.Icon size={14} />
+                {actState === "pending" ? act.pending : act.verb}
+              </button>
+            )}
+            {actState === "error" && (
+              <span className="text-[12px] text-bad">Failed — try again</span>
+            )}
+            <span className="ml-auto text-[11px] text-dim">
+              nothing goes out without your go
+            </span>
+          </div>
+        )}
+      </div>
 
       {open && hasDetail && (
         <Dialog title={item.title} onClose={() => setOpen(false)}>
