@@ -62,8 +62,8 @@ export default function SignInPage() {
     try {
       await cytapi.auth.verifySmsCode(normalizePhone(phone), code);
       setNote("Verified. Signing you in…");
-      // On a live backend the session cookie is set here; route into the app.
-      window.location.href = "/";
+      // The session cookie is set here; land the user on their own dashboard.
+      window.location.href = "/dashboard";
     } catch {
       setError("Couldn't verify — the auth backend isn't live yet.");
     } finally {

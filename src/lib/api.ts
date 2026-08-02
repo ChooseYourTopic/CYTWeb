@@ -24,6 +24,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       "X-API-Key": API_KEY,
       ...options.headers,
     },
+    // Send/receive the session cookie set by the SMS auth flow so the signed-in
+    // user's own surfaces (/me/*) and topic ownership work. Same-origin in prod.
+    credentials: "include",
     // Live dashboard data must never be statically cached.
     cache: "no-store",
   });
@@ -173,6 +176,42 @@ export type DailyReport = {
 
 export type CreateTopicResponse = { topic_id: string | number };
 
+/* ------------------------- Signed-in user (me) ---------------------------- */
+
+export type MeProfile = {
+  id: number;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  is_admin: boolean;
+  topics_count: number;
+  joined_at: string | null;
+};
+
+export type TopicReviewStatus = "queued" | "reviewing" | "reviewed";
+
+export type MyTopic = {
+  id: number;
+  name: string;
+  topic: string;
+  industry: string | null;
+  status: TopicReviewStatus;
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  tasks_failed: number;
+  findings: number;
+  reviewed: boolean;
+  last_activity_at: string | null;
+  created_at: string | null;
+};
+
+export type MyTopicsResponse = {
+  user: { id: number; name: string | null; phone: string | null };
+  count: number;
+  topics: MyTopic[];
+};
+
 /* ------------------------------ API surface ------------------------------- */
 
 export const cytapi = {
@@ -216,7 +255,13 @@ export const cytapi = {
         code,
       }),
     session: () =>
-      client.get<{ authenticated: boolean; phone?: string }>("/auth/session"),
+      client.get<{ authenticated: boolean; phone?: string; is_admin?: boolean }>(
+        "/auth/session",
+      ),
     logout: () => client.post<void>("/auth/logout"),
   },
+
+  // The signed-in user's own surfaces (session-backed; require credentials).
+  me: () => client.get<MeProfile>("/me"),
+  myTopics: () => client.get<MyTopicsResponse>("/me/topics"),
 };
