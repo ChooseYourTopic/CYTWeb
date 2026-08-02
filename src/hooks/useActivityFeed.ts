@@ -20,9 +20,14 @@ type Options = {
 export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = {}) {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [connected, setConnected] = useState(false);
+  // REST polling keeps the feed live even when the WebSocket can't reach Reverb
+  // (e.g. behind a front nginx without a WS upgrade route) — this is the
+  // reliable live path on production.
+  const [restLive, setRestLive] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const attempts = useRef(0);
   const lastSeq = useRef(0);
   const closedByUs = useRef(false);
@@ -59,6 +64,21 @@ export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = 
       // Backend may not implement backfill yet — fail soft.
     }
   }, [backfill, ingest]);
+
+  /**
+   * Poll for new events since the last seen id. The initial call (lastSeq 0)
+   * loads the recent feed; subsequent calls only pull the delta. This drives
+   * the live feed AND the per-section "new" badges without a WebSocket.
+   */
+  const poll = useCallback(async () => {
+    try {
+      const missed = await cytapi.activitySince(lastSeq.current);
+      ingest(missed);
+      setRestLive(true);
+    } catch {
+      setRestLive(false);
+    }
+  }, [ingest]);
 
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -109,12 +129,17 @@ export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = 
   useEffect(() => {
     closedByUs.current = false;
     connect();
+    // Reliable live path: initial load + delta polling (every 4s).
+    void poll();
+    pollTimer.current = setInterval(() => void poll(), 4000);
     return () => {
       closedByUs.current = true;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (pollTimer.current) clearInterval(pollTimer.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [connect, poll]);
 
-  return { events, connected };
+  // "Live" if either transport is delivering events.
+  return { events, connected: connected || restLive };
 }
