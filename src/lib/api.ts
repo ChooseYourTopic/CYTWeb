@@ -246,6 +246,12 @@ export type CreateTopicResponse = { topic_id: string | number };
 
 /* ------------------------- Signed-in user (me) ---------------------------- */
 
+export type UserPreferences = {
+  timezone: string | null;
+  daily_budget_usd: number | null;
+  platform_daily_budget_usd: number;
+};
+
 export type MeProfile = {
   id: number;
   name: string | null;
@@ -254,6 +260,7 @@ export type MeProfile = {
   is_admin: boolean;
   topics_count: number;
   joined_at: string | null;
+  preferences?: UserPreferences;
 };
 
 export type TopicReviewStatus = "queued" | "reviewing" | "reviewed";
@@ -539,6 +546,12 @@ export const cytapi = {
   // The signed-in user's own surfaces (session-backed; require credentials).
   me: () => client.get<MeProfile>("/me"),
   myTopics: () => client.get<MyTopicsResponse>("/me/topics"),
+  updateProfile: (patch: { name?: string; email?: string | null }) =>
+    client.put<MeProfile>("/me", patch),
+  updatePreferences: (patch: {
+    timezone?: string | null;
+    daily_budget_usd?: number | null;
+  }) => client.put<UserPreferences>("/me/preferences", patch),
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the
   // user's agent usage runs on their own account.

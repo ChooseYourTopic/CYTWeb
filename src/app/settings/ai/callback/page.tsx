@@ -26,7 +26,7 @@ function Callback() {
 
     cytapi.aiCredential
       .oauthCallback(code, state)
-      .then(() => router.replace("/settings/ai"))
+      .then(() => router.replace("/settings"))
       .catch(() =>
         setError("Couldn't finish connecting. Please try again from settings."),
       );
@@ -39,7 +39,7 @@ function Callback() {
           <AlertTriangle size={28} className="mx-auto text-warn" />
           <p className="mt-3 text-[15px] text-ink">{error}</p>
           <button
-            onClick={() => router.replace("/settings/ai")}
+            onClick={() => router.replace("/settings")}
             className="mt-4 rounded-xl border border-line bg-panel2 px-4 py-2 text-[13px] text-mut transition-colors hover:text-ink"
           >
             Back to settings

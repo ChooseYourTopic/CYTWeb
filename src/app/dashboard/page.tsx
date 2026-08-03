@@ -12,7 +12,7 @@ import {
   Clock,
   Search,
   FolderOpen,
-  KeyRound,
+  Settings,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -183,10 +183,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href="/settings/ai"
+              href="/settings"
               className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
             >
-              <KeyRound size={14} /> AI account
+              <Settings size={14} /> Settings
             </Link>
             <button
               onClick={signOut}
