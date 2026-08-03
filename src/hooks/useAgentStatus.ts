@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { cytapi, type AgentStatus } from "@/lib/api";
 
-/** Polls GET /agents/status on an interval. Fail-soft: keeps last-good data. */
-export function useAgentStatus(pollIntervalMs = 30000) {
+/**
+ * Polls GET /agents/status on an interval, scoped to a topic/company when given.
+ * Fail-soft: keeps last-good data.
+ */
+export function useAgentStatus(companyId?: string | number, pollIntervalMs = 30000) {
   const [statuses, setStatuses] = useState<AgentStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +18,7 @@ export function useAgentStatus(pollIntervalMs = 30000) {
 
     const load = async () => {
       try {
-        const data = await cytapi.agentStatus();
+        const data = await cytapi.agentStatus(companyId);
         if (!cancelled.current) {
           setStatuses(data);
           setError(null);
@@ -33,7 +36,7 @@ export function useAgentStatus(pollIntervalMs = 30000) {
       cancelled.current = true;
       clearInterval(interval);
     };
-  }, [pollIntervalMs]);
+  }, [companyId, pollIntervalMs]);
 
   return { statuses, loading, error };
 }

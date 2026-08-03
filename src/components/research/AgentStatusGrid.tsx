@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ArrowUpCircle, Loader2 } from "lucide-react";
+import { ArrowUpCircle, Loader2, Play } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { cn, label } from "@/lib/utils";
 import {
@@ -54,8 +54,12 @@ function fmtTime(iso: string | null): string {
   return isNaN(d.getTime()) ? "" : d.toLocaleString();
 }
 
-export function AgentStatusGrid() {
-  const { statuses, loading } = useAgentStatus();
+export function AgentStatusGrid({
+  companyId,
+}: {
+  companyId?: string | number;
+}) {
+  const { statuses, loading } = useAgentStatus(companyId);
   const byType = new Map(statuses.map((s) => [s.agent_type, s]));
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [detail, setDetail] = useState<AgentDetail | null>(null);
@@ -66,7 +70,7 @@ export function AgentStatusGrid() {
     setDetail(null);
     setLoadingDetail(true);
     try {
-      setDetail(await cytapi.agentDetail(id));
+      setDetail(await cytapi.agentDetail(id, companyId));
     } catch {
       /* fail-soft — the modal shows the empty states */
     } finally {
@@ -77,11 +81,11 @@ export function AgentStatusGrid() {
   const reload = useCallback(async () => {
     if (!openFor) return;
     try {
-      setDetail(await cytapi.agentDetail(openFor));
+      setDetail(await cytapi.agentDetail(openFor, companyId));
     } catch {
       /* keep the last-good detail */
     }
-  }, [openFor]);
+  }, [openFor, companyId]);
 
   return (
     <>
@@ -126,7 +130,7 @@ export function AgentStatusGrid() {
               Loading the agent&apos;s work…
             </div>
           ) : detail ? (
-            <AgentDetailView d={detail} onReload={reload} />
+            <AgentDetailView d={detail} companyId={companyId} onReload={reload} />
           ) : (
             <div className="py-8 text-center text-[13px] text-dim">
               No data for this agent yet.
@@ -174,13 +178,17 @@ function Row({
 
 function AgentDetailView({
   d,
+  companyId,
   onReload,
 }: {
   d: AgentDetail;
+  companyId?: string | number;
   onReload: () => Promise<void>;
 }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [review, setReview] = useState<PrioritizeResult | null>(null);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
 
   async function prioritize(taskId: number) {
     setBusyId(taskId);
@@ -195,9 +203,41 @@ function AgentDetailView({
     }
   }
 
+  async function runNow() {
+    if (triggering) return;
+    setTriggering(true);
+    setTriggerMsg(null);
+    try {
+      await cytapi.agentTrigger(d.agent_type, companyId);
+      setTriggerMsg("Queued — this agent is running now.");
+      // Give the job a moment to land, then refresh the run/queue view.
+      setTimeout(() => void onReload(), 1500);
+    } catch {
+      setTriggerMsg("Couldn't trigger — please try again.");
+    } finally {
+      setTriggering(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <div className="text-[13px] text-mut">{d.role}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[13px] text-mut">{d.role}</div>
+        <button
+          onClick={runNow}
+          disabled={triggering}
+          title="Kick a one-off run of this agent for this topic"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#223257] bg-brand/10 px-2.5 py-1 text-[12px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
+        >
+          {triggering ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Play size={12} />
+          )}
+          Run now
+        </button>
+      </div>
+      {triggerMsg && <div className="text-[12px] text-good">{triggerMsg}</div>}
 
       <div>
         <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">

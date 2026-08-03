@@ -221,6 +221,9 @@ export type TopicOverview = {
   cycle_day?: number;
   cycle_phase?: string;
   exec_summary?: string;
+  // How this topic's agents run: live on the owner's account vs preview/mock.
+  run_mode?: "live" | "preview";
+  run_source?: "user" | "platform" | "none";
   kpis?: {
     tasks_today?: number;
     findings?: number;
@@ -448,6 +451,11 @@ function normalizeSection(section: FetchableSection, raw: any): SectionItem[] {
 
 /* ------------------------------ API surface ------------------------------- */
 
+// Company-scope query fragment for the dashboard surfaces.
+function cq(companyId?: string | number): string {
+  return companyId ? `?company_id=${companyId}` : "";
+}
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -456,12 +464,17 @@ export const cytapi = {
   // Dashboard KPIs.
   dashboardSummary: () => client.get<DashboardSummary>("/dashboard/summary"),
 
-  // Agent status grid (polled by useAgentStatus).
-  agentStatus: () => client.get<AgentStatus[]>("/agents/status"),
+  // Agent status grid (polled by useAgentStatus), scoped to a topic/company.
+  agentStatus: (companyId?: string | number) =>
+    client.get<AgentStatus[]>(`/agents/status${cq(companyId)}`),
 
   // Full working picture for one agent: skills, queue, process (runs), actions.
-  agentDetail: (agentType: string) =>
-    client.get<AgentDetail>(`/agents/${agentType}/detail`),
+  agentDetail: (agentType: string, companyId?: string | number) =>
+    client.get<AgentDetail>(`/agents/${agentType}/detail${cq(companyId)}`),
+
+  // Kick a one-off run of an agent for a topic (manual trigger).
+  agentTrigger: (agentType: string, companyId?: string | number) =>
+    client.post<{ message: string }>(`/agents/${agentType}/trigger${cq(companyId)}`),
 
   // Tasks list (Decisions panel).
   tasks: (limit = 100) => client.get<Task[]>(`/tasks?limit=${limit}`),
@@ -473,8 +486,9 @@ export const cytapi = {
   prioritizeTask: (id: number) =>
     client.post<PrioritizeResult>(`/tasks/${id}/prioritize`),
 
-  // Finance snapshot (spend / MRR tiles).
-  financeSummary: () => client.get<FinanceSummary>("/finance/summary"),
+  // Finance snapshot (spend / MRR tiles), scoped to a topic/company.
+  financeSummary: (companyId?: string | number) =>
+    client.get<FinanceSummary>(`/finance/summary${cq(companyId)}`),
 
   // Living-report topic surfaces — normalized from the backend's domain shapes.
   topicOverview: async (id: string): Promise<TopicOverview> => {
@@ -508,6 +522,8 @@ export const cytapi = {
       topic: raw?.company?.topic ?? "",
       tagline: raw?.company?.value_prop,
       exec_summary: plan.summary ?? raw?.company?.mission,
+      run_mode: raw?.run_mode,
+      run_source: raw?.run_source,
       kpis: raw?.kpis ?? {},
       spark: raw?.spark ?? [],
       items,
@@ -523,9 +539,11 @@ export const cytapi = {
   reports: (limit = 20) => client.get<DailyReport[]>(`/reports?limit=${limit}`),
   report: (id: string) => client.get<DailyReport>(`/reports/${id}`),
 
-  // Backfill activity events missed across a WS reconnect.
-  activitySince: (sinceId: number) =>
-    client.get<ActivityEvent[]>(`/activity?since=${sinceId}`),
+  // Backfill activity events missed across a WS reconnect, scoped to a topic.
+  activitySince: (sinceId: number, companyId?: string | number) =>
+    client.get<ActivityEvent[]>(
+      `/activity?since=${sinceId}${companyId ? `&company_id=${companyId}` : ""}`,
+    ),
 
   // Phone-first SMS-code auth. Fail-soft in the UI until CYTAPI ships these.
   auth: {

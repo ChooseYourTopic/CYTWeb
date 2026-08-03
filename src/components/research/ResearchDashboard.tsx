@@ -21,6 +21,44 @@ import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
+import Link from "next/link";
+
+/** Live-vs-preview pill in the topic header. Links to Settings to switch. */
+function RunModeBadge({
+  mode,
+  source,
+}: {
+  mode?: "live" | "preview";
+  source?: "user" | "platform" | "none";
+}) {
+  if (!mode) return null;
+  const live = mode === "live";
+  const text = live
+    ? source === "user"
+      ? "Live · your account"
+      : "Live"
+    : "Preview";
+  return (
+    <Link
+      href="/settings"
+      title={
+        live
+          ? "Agents are making real model calls"
+          : "Preview mode — connect your account in Settings to run live"
+      }
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+        live
+          ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
+          : "border-line bg-panel2 text-mut hover:text-ink"
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${live ? "bg-good" : "bg-dim"}`}
+      />
+      {text}
+    </Link>
+  );
+}
 
 /**
  * The living research dashboard: KPI row, a tabbed report canvas that fills in
@@ -44,7 +82,7 @@ export function ResearchDashboard({
   );
 
   // Real per-company financials (incl. AI spend) for the spend KPI tile.
-  const { summary: finance } = useFinanceSummary();
+  const { summary: finance } = useFinanceSummary(topicId);
 
   // Reset the tab to Overview whenever the topic changes.
   const setActive = useResearchStore((s) => s.setActiveSection);
@@ -78,8 +116,9 @@ export function ResearchDashboard({
           <div className="text-[13px] uppercase tracking-wide text-mut">
             Your topic
           </div>
-          <h2 className="mt-1 text-[24px] font-bold tracking-tight">
+          <h2 className="mt-1 flex items-center gap-2.5 text-[24px] font-bold tracking-tight">
             {topicName}
+            <RunModeBadge mode={overview?.run_mode} source={overview?.run_source} />
           </h2>
           <div className="text-[14px] text-mut">{tagline}</div>
         </div>
@@ -122,7 +161,7 @@ export function ResearchDashboard({
           </div>
         </Card>
 
-        <InvestigationRail />
+        <InvestigationRail companyId={topicId} />
       </div>
     </main>
   );

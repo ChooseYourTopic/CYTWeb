@@ -8,6 +8,8 @@ type Options = {
   maxEvents?: number;
   /** Enable REST backfill of events missed during a disconnect. */
   backfill?: boolean;
+  /** Scope the feed to one topic/company. */
+  companyId?: string | number;
 };
 
 /**
@@ -17,7 +19,11 @@ type Options = {
  *    never develops holes across a dropped socket,
  *  - per-section "new results" bumping via the research store.
  */
-export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = {}) {
+export function useActivityFeed({
+  maxEvents = 100,
+  backfill = true,
+  companyId,
+}: Options = {}) {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [connected, setConnected] = useState(false);
   // REST polling keeps the feed live even when the WebSocket can't reach Reverb
@@ -57,13 +63,13 @@ export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = 
   const doBackfill = useCallback(async () => {
     if (!backfill || lastSeq.current === 0) return;
     try {
-      const missed = await cytapi.activitySince(lastSeq.current);
+      const missed = await cytapi.activitySince(lastSeq.current, companyId);
       // Server returns ascending; ingest so higher ids win.
       ingest(missed);
     } catch {
       // Backend may not implement backfill yet — fail soft.
     }
-  }, [backfill, ingest]);
+  }, [backfill, companyId, ingest]);
 
   /**
    * Poll for new events since the last seen id. The initial call (lastSeq 0)
@@ -72,13 +78,13 @@ export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = 
    */
   const poll = useCallback(async () => {
     try {
-      const missed = await cytapi.activitySince(lastSeq.current);
+      const missed = await cytapi.activitySince(lastSeq.current, companyId);
       ingest(missed);
       setRestLive(true);
     } catch {
       setRestLive(false);
     }
-  }, [ingest]);
+  }, [companyId, ingest]);
 
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -125,6 +131,13 @@ export function useActivityFeed({ maxEvents = 100, backfill = true }: Options = 
       reconnectTimer.current = setTimeout(connect, delay);
     }
   }, [doBackfill, ingest, setWsConnected]);
+
+  // Switching topics: drop the prior topic's events and reset the cursor so the
+  // next poll reloads this topic's feed from scratch.
+  useEffect(() => {
+    lastSeq.current = 0;
+    setEvents([]);
+  }, [companyId]);
 
   useEffect(() => {
     closedByUs.current = false;

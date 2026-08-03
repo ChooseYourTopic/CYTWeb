@@ -66,8 +66,8 @@ export function ActivityFeedView({
   );
 }
 
-/** Container — wires the live hook to the view. */
-export function ActivityFeed() {
-  const { events, connected } = useActivityFeed({ maxEvents: 100 });
+/** Container — wires the live hook to the view, scoped to a topic/company. */
+export function ActivityFeed({ companyId }: { companyId?: string | number }) {
+  const { events, connected } = useActivityFeed({ maxEvents: 100, companyId });
   return <ActivityFeedView events={events} connected={connected} />;
 }
