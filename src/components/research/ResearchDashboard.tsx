@@ -22,6 +22,7 @@ import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
+import { ArrowLeft, Search } from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
 function RunModeBadge({
@@ -101,13 +102,27 @@ export function ResearchDashboard({
   return (
     <main className="mx-auto max-w-[1180px] px-6 pb-16">
       {/* Top bar */}
-      <header className="mb-6 mt-6 flex items-center gap-3 text-[17px] font-bold tracking-tight">
-        <a href="/" className="flex items-center gap-3 text-ink">
+      <header className="mb-6 mt-6 flex items-center justify-between gap-3">
+        <a
+          href="/"
+          className="flex items-center gap-3 text-[17px] font-bold tracking-tight text-ink"
+        >
           <span className="cyt-gradient-bg grid h-7 w-7 place-items-center rounded-lg text-[13px] font-extrabold text-bg">
             {BRAND.MARK}
           </span>
           {BRAND.APP_NAME}
         </a>
+
+        {/* Back to the home profile to browse or search for other topics */}
+        <Link
+          href="/dashboard"
+          title="Back to your topics — start or search for another topic"
+          className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+        >
+          <ArrowLeft size={14} />
+          <span className="hidden sm:inline">Your topics</span>
+          <Search size={13} className="opacity-70" />
+        </Link>
       </header>
 
       {/* Topic header */}
