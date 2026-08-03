@@ -12,6 +12,7 @@ import {
   Clock,
   Search,
   FolderOpen,
+  KeyRound,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -180,12 +181,20 @@ export default function DashboardPage() {
               )}
             </p>
           </div>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
-          >
-            <LogOut size={14} /> Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/settings/ai"
+              className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+            >
+              <KeyRound size={14} /> AI account
+            </Link>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+            >
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
         </div>
 
         {/* Start a new topic */}

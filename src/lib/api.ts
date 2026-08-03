@@ -45,6 +45,7 @@ export const client = {
     request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) }),
+  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
 /* ----------------------------- Contract types ----------------------------- */
@@ -277,6 +278,18 @@ export type MyTopicsResponse = {
   user: { id: number; name: string | null; phone: string | null };
   count: number;
   topics: MyTopic[];
+};
+
+// Bring-your-own AI credential — how the signed-in user's agent work bills to
+// their own account. Secrets are never returned; this is status only.
+export type AiCredential = {
+  connected: boolean;
+  auth_type: "api_key" | "oauth" | null;
+  account_label: string | null;
+  status: "active" | "needs_reauth" | null;
+  expires_at: string | null;
+  last_validated_at: string | null;
+  oauth_available: boolean;
 };
 
 /* --------------------------- Section normalizers --------------------------- */
@@ -526,4 +539,22 @@ export const cytapi = {
   // The signed-in user's own surfaces (session-backed; require credentials).
   me: () => client.get<MeProfile>("/me"),
   myTopics: () => client.get<MyTopicsResponse>("/me/topics"),
+
+  // Bring-your-own AI credential — connect an API key or an OAuth account so the
+  // user's agent usage runs on their own account.
+  aiCredential: {
+    get: () => client.get<AiCredential>("/me/ai-credential"),
+    saveApiKey: (apiKey: string) =>
+      client.put<AiCredential>("/me/ai-credential/api-key", {
+        api_key: apiKey,
+      }),
+    disconnect: () => client.del<{ connected: boolean }>("/me/ai-credential"),
+    oauthStart: () =>
+      client.post<{ authorize_url: string }>("/me/ai-credential/oauth/start"),
+    oauthCallback: (code: string, state: string) =>
+      client.post<AiCredential>("/me/ai-credential/oauth/callback", {
+        code,
+        state,
+      }),
+  },
 };
