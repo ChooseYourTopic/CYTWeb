@@ -111,7 +111,23 @@ export type AgentQueueItem = {
   priority: number;
   source: string;
   result_summary: string | null;
+  prioritized?: boolean;
+  depends_on_count?: number;
   created_at: string | null;
+};
+
+/** The orchestrator's response to a prioritization request. */
+export type PrioritizeResult = {
+  task: { id: number; title: string; priority: number; status: string };
+  orchestrator_review: string;
+  moved_count: number;
+  dependencies_reviewed: {
+    id: number;
+    title: string;
+    agent_type: string;
+    status: string;
+    prioritized: boolean;
+  }[];
 };
 
 export type AgentAction = {
@@ -429,6 +445,13 @@ export const cytapi = {
 
   // Tasks list (Decisions panel).
   tasks: (limit = 100) => client.get<Task[]>(`/tasks?limit=${limit}`),
+
+  // Steer a task: approve/reject/priority, or escalate it to the orchestrator
+  // for prioritization (which also moves any blocking dependencies ahead).
+  updateTask: (id: number, patch: { status?: string; priority?: number }) =>
+    client.put<Task>(`/tasks/${id}`, patch),
+  prioritizeTask: (id: number) =>
+    client.post<PrioritizeResult>(`/tasks/${id}/prioritize`),
 
   // Finance snapshot (spend / MRR tiles).
   financeSummary: () => client.get<FinanceSummary>("/finance/summary"),

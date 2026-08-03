@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { ArrowUpCircle, Loader2 } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { cn, label } from "@/lib/utils";
-import { cytapi, type AgentStatus, type AgentDetail } from "@/lib/api";
+import {
+  cytapi,
+  type AgentStatus,
+  type AgentDetail,
+  type PrioritizeResult,
+} from "@/lib/api";
 import { Dialog } from "@/components/research/ProgressiveCard";
 
 // The v1 crew (Orchestrator/CEO + focused core), with room for the rest.
@@ -68,6 +74,15 @@ export function AgentStatusGrid() {
     }
   }
 
+  const reload = useCallback(async () => {
+    if (!openFor) return;
+    try {
+      setDetail(await cytapi.agentDetail(openFor));
+    } catch {
+      /* keep the last-good detail */
+    }
+  }, [openFor]);
+
   return (
     <>
       <div className="flex flex-col gap-0.5 p-2">
@@ -111,7 +126,7 @@ export function AgentStatusGrid() {
               Loading the agent&apos;s work…
             </div>
           ) : detail ? (
-            <AgentDetailView d={detail} />
+            <AgentDetailView d={detail} onReload={reload} />
           ) : (
             <div className="py-8 text-center text-[13px] text-dim">
               No data for this agent yet.
@@ -157,7 +172,29 @@ function Row({
   );
 }
 
-function AgentDetailView({ d }: { d: AgentDetail }) {
+function AgentDetailView({
+  d,
+  onReload,
+}: {
+  d: AgentDetail;
+  onReload: () => Promise<void>;
+}) {
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [review, setReview] = useState<PrioritizeResult | null>(null);
+
+  async function prioritize(taskId: number) {
+    setBusyId(taskId);
+    try {
+      const res = await cytapi.prioritizeTask(taskId);
+      setReview(res);
+      await onReload();
+    } catch {
+      /* fail-soft */
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="text-[13px] text-mut">{d.role}</div>
@@ -197,16 +234,74 @@ function AgentDetailView({ d }: { d: AgentDetail }) {
         <div className="mb-1 text-[11px] uppercase tracking-wider text-dim">
           Queue ({d.queue.length}) — assigned by the team lead, by priority
         </div>
+
+        {review && (
+          <div className="mb-2 rounded-[10px] border border-[#3a2f12] bg-[#1c160a] p-3">
+            <div className="text-[12px] font-medium text-warn">
+              Orchestrator review
+            </div>
+            <div className="mt-1 text-[12px] text-ink/90">
+              {review.orchestrator_review}
+            </div>
+            {review.dependencies_reviewed.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {review.dependencies_reviewed.map((dp) => (
+                  <div
+                    key={dp.id}
+                    className="flex items-center justify-between text-[11px]"
+                  >
+                    <span className="text-mut">
+                      {dp.title}{" "}
+                      <span className="text-dim">({label(dp.agent_type)})</span>
+                    </span>
+                    <span className={dp.prioritized ? "text-good" : "text-dim"}>
+                      {dp.prioritized ? "moved ahead ↑" : `${dp.status}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {d.queue.length === 0 ? (
           <div className="py-2 text-[12px] text-dim">Nothing queued.</div>
         ) : (
           d.queue.map((t) => (
-            <Row
-              key={t.id}
-              left={t.title}
-              right={<StatusPill s={t.status} />}
-              sub={`priority ${t.priority} · ${t.source}`}
-            />
+            <div key={t.id} className="border-b border-line py-2 last:border-0">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-[13px] text-ink">{t.title}</span>
+                <StatusPill s={t.status} />
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-dim">
+                  priority {t.priority}
+                  {t.depends_on_count
+                    ? ` · ${t.depends_on_count} dependency${t.depends_on_count > 1 ? "ies" : ""}`
+                    : ""}{" "}
+                  · {t.source}
+                </span>
+                {t.prioritized ? (
+                  <span className="text-[11px] font-medium text-good">
+                    ✓ prioritized
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => prioritize(t.id)}
+                    disabled={busyId === t.id}
+                    title="Ask the orchestrator to move this up (and any blocking dependencies)"
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-[#223257] bg-brand/10 px-2.5 py-1 text-[12px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
+                  >
+                    {busyId === t.id ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <ArrowUpCircle size={12} />
+                    )}
+                    Prioritize
+                  </button>
+                )}
+              </div>
+            </div>
           ))
         )}
       </div>
