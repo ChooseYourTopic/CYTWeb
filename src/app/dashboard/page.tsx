@@ -15,6 +15,7 @@ import {
   Settings,
   Pause,
   Play,
+  Sparkles,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -332,6 +333,15 @@ export default function DashboardPage() {
               )}
               {creating ? "Starting…" : "Start"}
             </button>
+          </div>
+          <div className="mt-2.5 flex items-center gap-1.5 text-[13px] text-mut">
+            <span>Not sure what to build?</span>
+            <Link
+              href="/choose"
+              className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+            >
+              <Sparkles size={13} /> Help me choose a topic
+            </Link>
           </div>
         </div>
 
