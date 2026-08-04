@@ -269,6 +269,7 @@ export type ViewMode = "standard" | "advanced";
 
 export type AiExperience = "new" | "advanced";
 export type BusinessExperience = "new" | "experienced";
+export type SocialPlatform = "youtube" | "tiktok" | "instagram" | "x";
 
 export type UserPreferences = {
   timezone: string | null;
@@ -279,6 +280,10 @@ export type UserPreferences = {
   // Onboarding persona — the user's starting point ("first context").
   ai_experience: AiExperience | null;
   business_experience: BusinessExperience | null;
+  // Onboarding — existing web/social presence.
+  website: string | null;
+  social_platform: SocialPlatform | null;
+  social_handle: string | null;
 };
 
 export type MeProfile = {
@@ -641,6 +646,9 @@ export const cytapi = {
     view_mode?: ViewMode;
     ai_experience?: AiExperience | null;
     business_experience?: BusinessExperience | null;
+    website?: string | null;
+    social_platform?: SocialPlatform | null;
+    social_handle?: string | null;
   }) => client.put<UserPreferences>("/me/preferences", patch),
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the

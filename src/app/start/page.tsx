@@ -10,9 +10,18 @@ import {
   ApiError,
   type AiExperience,
   type BusinessExperience,
+  type SocialPlatform,
 } from "@/lib/api";
 
 type Clarity = "know" | "idea";
+type YesNo = "yes" | "no";
+
+const PLATFORMS: { key: SocialPlatform; label: string }[] = [
+  { key: "youtube", label: "YouTube" },
+  { key: "tiktok", label: "TikTok" },
+  { key: "instagram", label: "Instagram" },
+  { key: "x", label: "X (Twitter)" },
+];
 
 function Choice<T extends string>({
   options,
@@ -50,17 +59,31 @@ export default function StartPage() {
   const [ai, setAi] = useState<AiExperience | null>(null);
   const [biz, setBiz] = useState<BusinessExperience | null>(null);
   const [clarity, setClarity] = useState<Clarity | null>(null);
+  const [hasWebsite, setHasWebsite] = useState<YesNo | null>(null);
+  const [website, setWebsite] = useState("");
+  const [usesSocial, setUsesSocial] = useState<YesNo | null>(null);
+  const [socialPlatform, setSocialPlatform] = useState<SocialPlatform | null>(
+    null,
+  );
+  const [socialHandle, setSocialHandle] = useState("");
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const step1Ready = Boolean(ai && biz && clarity);
+  const step1Ready = Boolean(ai && biz && clarity && hasWebsite && usesSocial);
 
   function toStep2() {
     if (!step1Ready) return;
-    // Persist the persona ("first context") — best-effort, don't block.
+    // Persist the persona + web/social presence — best-effort, don't block.
     cytapi
-      .updatePreferences({ ai_experience: ai, business_experience: biz })
+      .updatePreferences({
+        ai_experience: ai,
+        business_experience: biz,
+        website: hasWebsite === "yes" ? website.trim() || null : null,
+        social_platform: usesSocial === "yes" ? socialPlatform : null,
+        social_handle:
+          usesSocial === "yes" ? socialHandle.trim() || null : null,
+      })
       .catch(() => {});
     setStep(2);
   }
@@ -143,6 +166,75 @@ export default function StartPage() {
                   value={clarity}
                   onChange={setClarity}
                 />
+              </div>
+
+              <div>
+                <div className="mb-2 text-[13px] font-semibold text-mut">
+                  Do you have a website?
+                </div>
+                <Choice<YesNo>
+                  options={[
+                    { key: "yes", label: "Yes" },
+                    { key: "no", label: "No" },
+                  ]}
+                  value={hasWebsite}
+                  onChange={setHasWebsite}
+                />
+                {hasWebsite === "yes" && (
+                  <input
+                    className="cyt-input mt-2"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="yourwebsite.com"
+                  />
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 text-[13px] font-semibold text-mut">
+                  Are you using social media?
+                </div>
+                <Choice<YesNo>
+                  options={[
+                    { key: "yes", label: "Yes" },
+                    { key: "no", label: "No" },
+                  ]}
+                  value={usesSocial}
+                  onChange={setUsesSocial}
+                />
+                {usesSocial === "yes" && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-[12px] text-dim">
+                      Your top platform
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {PLATFORMS.map((p) => (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => setSocialPlatform(p.key)}
+                          className={`rounded-xl border px-2 py-2 text-[12.5px] font-semibold transition-colors ${
+                            socialPlatform === p.key
+                              ? "border-[#31384c] bg-panel2 text-ink"
+                              : "border-line text-mut hover:text-ink"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    {socialPlatform && (
+                      <input
+                        className="cyt-input"
+                        value={socialHandle}
+                        onChange={(e) => setSocialHandle(e.target.value)}
+                        placeholder={`Your ${
+                          PLATFORMS.find((p) => p.key === socialPlatform)?.label
+                        } handle (@…)`}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
