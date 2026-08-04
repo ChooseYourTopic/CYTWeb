@@ -8,33 +8,58 @@ import {
   Clock,
   Coffee,
   Rocket,
+  Loader2,
+  X,
+  CheckCircle2,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
-import type { TopicOverview } from "@/lib/api";
+import { cytapi, ApiError, type TopicOverview } from "@/lib/api";
 
-/** Time-commitment presets — each expands progressively more of the report. */
-type Depth = "quick" | "couple" | "more" | "mission";
-
-const DEPTH_BUTTONS: { key: Depth; label: string; Icon: typeof Zap }[] = [
-  { key: "quick", label: "Something quick", Icon: Zap },
-  { key: "couple", label: "Got a couple minutes", Icon: Clock },
-  { key: "more", label: "Got a little more", Icon: Coffee },
-  { key: "mission", label: "I'm on a mission", Icon: Rocket },
-];
-
-// Report sections, top to bottom. A depth preset opens the first N of these.
-const SECTION_ORDER = ["decided", "value_prop", "plan", "goals"] as const;
-
-const DEPTH_OPEN_COUNT: Record<Depth, number> = {
-  quick: 1,
-  couple: 2,
-  more: 3,
-  mission: 4,
+/**
+ * Effort presets. Each activates a task on the project; the bigger the push, the
+ * more the agent team does — and the higher the estimated development cost.
+ */
+type Tier = {
+  key: string;
+  label: string;
+  Icon: typeof Zap;
+  blurb: string;
+  estUsd: number;
 };
 
-function openSetForDepth(d: Depth): Set<string> {
-  return new Set(SECTION_ORDER.slice(0, DEPTH_OPEN_COUNT[d]));
-}
+const TIERS: Tier[] = [
+  {
+    key: "quick",
+    label: "Something quick",
+    Icon: Zap,
+    blurb: "A fast, focused pass — one quick agent run to nudge the project forward.",
+    estUsd: 0.25,
+  },
+  {
+    key: "couple",
+    label: "Got a couple minutes",
+    Icon: Clock,
+    blurb: "A short burst across a couple of agents.",
+    estUsd: 1.0,
+  },
+  {
+    key: "more",
+    label: "Got a little more",
+    Icon: Coffee,
+    blurb: "A deeper dive across the core team.",
+    estUsd: 3.0,
+  },
+  {
+    key: "mission",
+    label: "I'm on a mission",
+    Icon: Rocket,
+    blurb: "A full push — the whole crew works the project end to end.",
+    estUsd: 10.0,
+  },
+];
+
+// Report sections, top to bottom.
+const SECTION_ORDER = ["decided", "value_prop", "plan", "goals"];
 
 /** A report section that collapses to just its header. */
 function CollapsibleSection({
@@ -69,14 +94,114 @@ function CollapsibleSection({
   );
 }
 
+/** Confirmation modal: project + estimated development cost + proceed. */
+function ActivateTaskModal({
+  tier,
+  projectName,
+  onClose,
+  onProceed,
+  submitting,
+  done,
+  error,
+}: {
+  tier: Tier;
+  projectName: string;
+  onClose: () => void;
+  onProceed: () => void;
+  submitting: boolean;
+  done: boolean;
+  error: string | null;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[440px] rounded-2xl border border-line bg-panel p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2 text-[16px] font-bold text-ink">
+            <tier.Icon size={18} className="text-brand" />
+            {tier.label}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-mut transition-colors hover:text-ink"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="mt-5 flex flex-col items-center gap-2 py-4 text-center">
+            <CheckCircle2 size={28} className="text-good" />
+            <p className="text-[14px] text-ink">Work started on {projectName}.</p>
+            <p className="text-[13px] text-mut">
+              Watch the live investigation as your agents get to it.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="mt-1 text-[13px] text-mut">
+              On <span className="text-ink">{projectName}</span>
+            </p>
+            <p className="mt-3 text-[14px] leading-relaxed text-ink/90">
+              {tier.blurb}
+            </p>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-panel2 px-4 py-3">
+              <span className="text-[13px] text-mut">Estimated cost</span>
+              <span className="text-[15px] font-bold text-ink">
+                ~${tier.estUsd.toFixed(2)}
+              </span>
+            </div>
+            <p className="mt-2 text-[11.5px] text-dim">
+              An estimate — actual spend depends on the work and is capped by your
+              daily budget.
+            </p>
+
+            {error && <p className="mt-3 text-[13px] text-bad">{error}</p>}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="rounded-xl border border-line bg-panel2 px-4 py-2 text-[14px] font-semibold text-mut transition-colors hover:text-ink disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onProceed}
+                disabled={submitting}
+                className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
+              >
+                {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
+                Proceed
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
- * Overview tab — the "living report": time-commitment presets up top, then the
- * highest-level decisions as individually collapsible sections. Fills in live.
+ * Overview tab — the "living report": effort presets that activate work (each
+ * confirmed in a cost modal), then the highest-level decisions as individually
+ * collapsible sections.
  */
 export function LivingReport({
   overview,
+  topicId,
 }: {
   overview: TopicOverview | null;
+  topicId?: string;
   loading?: boolean;
 }) {
   const items = overview?.items ?? [];
@@ -86,41 +211,69 @@ export function LivingReport({
     (i) => typeof i.id === "string" && i.id.startsWith("ov-goal-"),
   );
   const execSummary = overview?.exec_summary;
+  const projectName = overview?.topic || "your project";
 
-  const [depth, setDepth] = useState<Depth>("couple");
-  const [openSet, setOpenSet] = useState<Set<string>>(openSetForDepth("couple"));
-
-  function applyDepth(d: Depth) {
-    setDepth(d);
-    setOpenSet(openSetForDepth(d));
-  }
-  function toggle(key: string) {
+  // Sections are individually collapsible; all open by default.
+  const [openSet, setOpenSet] = useState<Set<string>>(new Set(SECTION_ORDER));
+  const toggle = (key: string) =>
     setOpenSet((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
   const isOpen = (k: string) => openSet.has(k);
+
+  // Effort modal state.
+  const [pendingTier, setPendingTier] = useState<Tier | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openTier(tier: Tier) {
+    setPendingTier(tier);
+    setSubmitting(false);
+    setDone(false);
+    setError(null);
+  }
+  function closeModal() {
+    setPendingTier(null);
+  }
+  async function proceed() {
+    if (!topicId) {
+      setError("No project in context.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      // Activate work on the project — the orchestrator plans + delegates.
+      await cytapi.agentTrigger("orchestrator", topicId);
+      setDone(true);
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? "Couldn't start the work. Please try again."
+          : "Something went wrong.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="space-y-3 p-4">
-      {/* Time-commitment presets — how much of the report to reveal. */}
+      {/* Effort presets — each activates a task (confirmed in a cost modal). */}
       <div className="flex flex-wrap justify-end gap-1.5">
-        {DEPTH_BUTTONS.map((b) => (
+        {TIERS.map((t) => (
           <button
-            key={b.key}
+            key={t.key}
             type="button"
-            onClick={() => applyDepth(b.key)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-              depth === b.key
-                ? "border-[#31384c] bg-panel2 text-ink"
-                : "border-line text-mut hover:text-ink"
-            }`}
+            onClick={() => openTier(t)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-mut transition-colors hover:border-[#31384c] hover:text-ink"
           >
-            <b.Icon size={13} />
-            {b.label}
+            <t.Icon size={13} />
+            {t.label}
           </button>
         ))}
       </div>
@@ -187,6 +340,18 @@ export function LivingReport({
             ))}
           </ul>
         </CollapsibleSection>
+      )}
+
+      {pendingTier && (
+        <ActivateTaskModal
+          tier={pendingTier}
+          projectName={projectName}
+          onClose={closeModal}
+          onProceed={proceed}
+          submitting={submitting}
+          done={done}
+          error={error}
+        />
       )}
     </div>
   );

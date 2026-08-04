@@ -342,7 +342,11 @@ export function ResearchDashboard({
               <SectionTabs />
               <div>
                 {active === "overview" && (
-                  <LivingReport overview={overview} loading={loading} />
+                  <LivingReport
+                    overview={overview}
+                    loading={loading}
+                    topicId={topicId}
+                  />
                 )}
                 {active === "competitors" && (
                   <CompetitorPanel topicId={topicId} />
