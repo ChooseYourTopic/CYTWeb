@@ -164,14 +164,18 @@ function ProfileCard({ me }: { me: MeProfile }) {
   }
 
   return (
-    <Card icon={UserIcon} title="Profile" desc="Your name and contact email.">
+    <Card
+      icon={UserIcon}
+      title="Profile"
+      desc="Your account name (shown on your dashboard instead of your phone) and contact email."
+    >
       <div className="grid gap-3">
-        <Field label="Name">
+        <Field label="Account name — shown on your dashboard">
           <input
             className="cyt-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
+            placeholder="e.g. Tracy, or Kuykendall Empire"
           />
         </Field>
         <Field label="Email">

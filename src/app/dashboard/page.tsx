@@ -262,13 +262,30 @@ export default function DashboardPage() {
             <h1 className="text-[28px] font-bold tracking-[-0.5px]">
               Your topics
             </h1>
-            <p className="mt-1 text-[14px] text-mut">
-              {me?.phone ? (
+            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[14px] text-mut">
+              {me?.name?.trim() ? (
                 <>
-                  Signed in as <span className="text-ink">{me.phone}</span>
+                  Signed in as{" "}
+                  <span className="text-ink">{me.name.trim()}</span>
+                </>
+              ) : me ? (
+                <>
+                  Signed in ·{" "}
+                  <Link href="/settings" className="text-brand hover:underline">
+                    Set an account name
+                  </Link>
                 </>
               ) : (
                 "Every topic you've started and how its review is going."
+              )}
+              {me?.joined_at && (
+                <span className="text-dim">
+                  · Member since{" "}
+                  {new Date(me.joined_at).toLocaleDateString(undefined, {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
               )}
             </p>
           </div>
