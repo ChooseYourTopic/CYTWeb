@@ -12,6 +12,7 @@ type Integration = {
 };
 
 const INTEGRATIONS: Integration[] = [
+  { name: "XTKRecall MCP", category: "Knowledge", desc: "Connect your XTKRecall vault over MCP — bring your agents, skills, and context.", color: "#7C3AED", initial: "X" },
   { name: "Twilio", category: "Communications", desc: "SMS, voice, and phone verification.", color: "#F22F46", initial: "T" },
   { name: "Supabase", category: "Data & Backend", desc: "Postgres database, auth, and storage.", color: "#3ECF8E", initial: "S" },
   { name: "DigitalOcean", category: "Infrastructure", desc: "Deploy and host your app and services.", color: "#0080FF", initial: "D" },

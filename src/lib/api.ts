@@ -176,6 +176,7 @@ export type SectionKey =
   | "context"
   | "integrations"
   | "models"
+  | "scheduling"
   | "competitors"
   | "market"
   | "drafts"

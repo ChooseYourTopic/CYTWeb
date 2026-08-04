@@ -8,6 +8,7 @@ import { LivingReport } from "@/components/research/LivingReport";
 import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
+import { SchedulingPanel } from "@/components/research/SchedulingPanel";
 import { CompetitorPanel } from "@/components/research/CompetitorPanel";
 import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
 import { DraftsPanel } from "@/components/research/DraftsPanel";
@@ -354,6 +355,7 @@ export function ResearchDashboard({
                 {active === "context" && <ContextPanel topicId={topicId} />}
                 {active === "integrations" && <IntegrationsPanel />}
                 {active === "models" && <ModelsPanel />}
+                {active === "scheduling" && <SchedulingPanel />}
                 {active === "competitors" && (
                   <CompetitorPanel topicId={topicId} />
                 )}
