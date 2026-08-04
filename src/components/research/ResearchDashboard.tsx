@@ -9,6 +9,9 @@ import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
 import { StatusPanel } from "@/components/research/StatusPanel";
+import { AutomationsPanel } from "@/components/research/AutomationsPanel";
+import { NetworkPanel } from "@/components/research/NetworkPanel";
+import { SecurityPanel } from "@/components/research/SecurityPanel";
 import { CompetitorPanel } from "@/components/research/CompetitorPanel";
 import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
 import { DraftsPanel } from "@/components/research/DraftsPanel";
@@ -356,6 +359,9 @@ export function ResearchDashboard({
                 {active === "integrations" && <IntegrationsPanel />}
                 {active === "models" && <ModelsPanel />}
                 {active === "status" && <StatusPanel topicId={topicId} />}
+                {active === "automations" && <AutomationsPanel />}
+                {active === "network" && <NetworkPanel />}
+                {active === "security" && <SecurityPanel />}
                 {active === "competitors" && (
                   <CompetitorPanel topicId={topicId} />
                 )}

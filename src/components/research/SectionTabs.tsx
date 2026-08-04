@@ -20,6 +20,9 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "finance", label: "Finance" },
   { key: "decisions", label: "Decisions" },
   { key: "report", label: "Report" },
+  { key: "automations", label: "Automations" },
+  { key: "network", label: "Network" },
+  { key: "security", label: "Security" },
 ];
 
 /**
@@ -36,6 +39,9 @@ export const CORE_SECTIONS: SectionKey[] = [
   "market",
   "drafts",
   "report",
+  "automations",
+  "network",
+  "security",
 ];
 
 /**

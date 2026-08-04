@@ -196,7 +196,10 @@ export type SectionKey =
   | "outreach"
   | "support"
   | "ads"
-  | "build";
+  | "build"
+  | "automations"
+  | "network"
+  | "security";
 
 // Sections fetched via GET /topic/{id}/{section} → SectionItem[].
 // (overview uses /overview, report uses /reports, decisions uses /tasks.)
