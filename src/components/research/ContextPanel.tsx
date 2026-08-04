@@ -39,6 +39,36 @@ function formatValuation(n: number): string {
     : `~$${Math.round(n / 1000)}K`;
 }
 
+/**
+ * Illustrative valuation for a company in this space. Starts from the selected
+ * categories, then shifts with the target market, competitor awareness, and the
+ * extra context provided. Rough — not real market data.
+ */
+function computeValuation(ctx: TopicContext, cats: string[]): number {
+  const catVals = cats.map((c) => CATEGORY_VALUATION[c]).filter(Boolean);
+  let value = catVals.length
+    ? catVals.reduce((a, b) => a + b, 0) / catVals.length
+    : 1_000_000;
+
+  // Target market shapes scale.
+  const tm = (ctx.target_market ?? "").toLowerCase();
+  if (/enterprise|b2b|corporate|premium|luxury|professional/.test(tm)) value *= 1.4;
+  if (/global|nationwide|national|worldwide|scale/.test(tm)) value *= 1.3;
+  if (/local|neighborhood|hobby|small|niche|community/.test(tm)) value *= 0.75;
+  if (tm.trim().length > 40) value *= 1.1; // a well-defined market
+
+  // Competitor awareness signals a real, validated market.
+  const comp = (ctx.competitor_notes ?? "").trim();
+  if (comp.length > 0) value *= 1.1;
+  if (comp.length > 120) value *= 1.1;
+
+  // Extra context adds a little refinement (capped).
+  const notes = (ctx.notes ?? "").trim();
+  value *= 1 + Math.min(notes.length, 400) / 4000;
+
+  return Math.round(value);
+}
+
 function Field({
   label,
   hint,
@@ -118,13 +148,8 @@ export function ContextPanel({ topicId }: { topicId: string }) {
     });
   }
 
-  // Rough valuation = average of the selected spaces (default ~$1M).
-  const vals = [...selectedCats]
-    .map((c) => CATEGORY_VALUATION[c])
-    .filter(Boolean);
-  const valuation = vals.length
-    ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
-    : 1_000_000;
+  // Rough valuation — categories + target market + competitor notes + context.
+  const valuation = computeValuation(ctx, [...selectedCats]);
 
   async function save() {
     if (busy) return;
