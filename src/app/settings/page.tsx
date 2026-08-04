@@ -136,19 +136,32 @@ export default function SettingsPage() {
 /* ------------------------------- Profile ---------------------------------- */
 
 function ProfileCard({ me }: { me: MeProfile }) {
-  const [name, setName] = useState(me.name ?? "");
+  // Ignore a legacy masked-phone name so it reads as "unset".
+  const initialName = me.name && !me.name.includes("*") ? me.name : "";
+  const [name, setName] = useState(initialName);
+  const [nickname, setNickname] = useState(me.nickname ?? "");
+  const [showNickname, setShowNickname] = useState(me.show_nickname);
   const [email, setEmail] = useState(me.email ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const dirty = name !== (me.name ?? "") || email !== (me.email ?? "");
+  const dirty =
+    name !== initialName ||
+    nickname !== (me.nickname ?? "") ||
+    showNickname !== me.show_nickname ||
+    email !== (me.email ?? "");
 
   async function save() {
     if (busy || !dirty) return;
     setBusy(true);
     setMsg(null);
     try {
-      await cytapi.updateProfile({ name: name.trim(), email: email.trim() || null });
+      await cytapi.updateProfile({
+        name: name.trim() || null,
+        nickname: nickname.trim() || null,
+        show_nickname: showNickname,
+        email: email.trim() || null,
+      });
       setMsg({ ok: true, text: "Saved." });
     } catch (e) {
       setMsg({
@@ -178,6 +191,25 @@ function ProfileCard({ me }: { me: MeProfile }) {
             placeholder="e.g. Tracy, or Kuykendall Empire"
           />
         </Field>
+        <Field label="Nickname">
+          <input
+            className="cyt-input"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder="Optional — a shorter name to go by"
+          />
+        </Field>
+        <label className="flex cursor-pointer items-center gap-2.5 py-0.5">
+          <input
+            type="checkbox"
+            checked={showNickname}
+            onChange={(e) => setShowNickname(e.target.checked)}
+            className="h-4 w-4 accent-[#6366f1]"
+          />
+          <span className="text-[13px] text-mut">
+            Show my nickname in place of my account name
+          </span>
+        </label>
         <Field label="Email">
           <input
             type="email"

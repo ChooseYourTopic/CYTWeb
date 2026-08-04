@@ -265,6 +265,10 @@ export type UserPreferences = {
 export type MeProfile = {
   id: number;
   name: string | null;
+  nickname: string | null;
+  show_nickname: boolean;
+  // Identity shown across the app: nickname (if opted in) else account name.
+  display_name: string | null;
   phone: string | null;
   email: string | null;
   is_admin: boolean;
@@ -587,8 +591,12 @@ export const cytapi = {
     client.post<PauseResult>(`/me/topics/${id}/pause`),
   resumeTopic: (id: string | number) =>
     client.post<PauseResult>(`/me/topics/${id}/resume`),
-  updateProfile: (patch: { name?: string; email?: string | null }) =>
-    client.put<MeProfile>("/me", patch),
+  updateProfile: (patch: {
+    name?: string | null;
+    nickname?: string | null;
+    show_nickname?: boolean;
+    email?: string | null;
+  }) => client.put<MeProfile>("/me", patch),
   updatePreferences: (patch: {
     timezone?: string | null;
     daily_budget_usd?: number | null;

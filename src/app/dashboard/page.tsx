@@ -263,10 +263,10 @@ export default function DashboardPage() {
               Your topics
             </h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[14px] text-mut">
-              {me?.name?.trim() ? (
+              {me?.display_name ? (
                 <>
                   Signed in as{" "}
-                  <span className="text-ink">{me.name.trim()}</span>
+                  <span className="text-ink">{me.display_name}</span>
                 </>
               ) : me ? (
                 <>
