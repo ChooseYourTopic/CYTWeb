@@ -76,6 +76,22 @@ const CATALOG: { category: string; ideas: string[] }[] = [
       "a course platform for hands-on trades",
     ],
   },
+  {
+    category: "Music & Entertainment",
+    ideas: [
+      "a subscription box for vinyl record collectors",
+      "an app that books local live music gigs",
+      "a platform for indie artists to sell merch",
+    ],
+  },
+  {
+    category: "Art & Design",
+    ideas: [
+      "a marketplace for custom digital portraits",
+      "a print-on-demand shop for indie illustrators",
+      "an app that matches homeowners with local muralists",
+    ],
+  },
 ];
 
 export default function ChoosePage() {
