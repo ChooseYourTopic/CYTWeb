@@ -189,6 +189,31 @@ function AgentDetailView({
   const [review, setReview] = useState<PrioritizeResult | null>(null);
   const [triggering, setTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
+  const [tab, setTab] = useState<"queue" | "context">("queue");
+  const [ctxText, setCtxText] = useState("");
+  const [ctxBusy, setCtxBusy] = useState(false);
+  const [ctxMsg, setCtxMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Where this agent's start-up ritual lives (shown in the description).
+  const startupFile = `agents/${d.agent_type}/startup-ritual.md`;
+
+  async function saveContext() {
+    if (!companyId || !ctxText.trim() || ctxBusy) return;
+    setCtxBusy(true);
+    setCtxMsg(null);
+    try {
+      const cur = await cytapi.topicContext(companyId);
+      const note = `[${label(d.agent_type)}] ${ctxText.trim()}`;
+      const notes = cur.context?.notes ? `${cur.context.notes}\n${note}` : note;
+      await cytapi.saveTopicContext(companyId, { notes });
+      setCtxText("");
+      setCtxMsg({ ok: true, text: "Context added for this agent." });
+    } catch {
+      setCtxMsg({ ok: false, text: "Couldn't save. Please try again." });
+    } finally {
+      setCtxBusy(false);
+    }
+  }
 
   async function prioritize(taskId: number) {
     setBusyId(taskId);
@@ -222,7 +247,15 @@ function AgentDetailView({
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[13px] text-mut">{d.role}</div>
+        <div className="min-w-0">
+          <div className="text-[13px] text-mut">{d.role}</div>
+          <div className="mt-0.5 text-[11.5px] text-dim">
+            Startup ritual ·{" "}
+            <code className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut">
+              {startupFile}
+            </code>
+          </div>
+        </div>
         <button
           onClick={runNow}
           disabled={triggering}
@@ -270,6 +303,34 @@ function AgentDetailView({
         </span>
       </div>
 
+      {/* Queue / Add context tabs */}
+      <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("queue")}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+            tab === "queue"
+              ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+              : "text-mut hover:text-ink"
+          }`}
+        >
+          Queue
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("context")}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+            tab === "context"
+              ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+              : "text-mut hover:text-ink"
+          }`}
+        >
+          Add context
+        </button>
+      </div>
+
+      {tab === "queue" ? (
+        <>
       <div>
         <div className="mb-1 text-[11px] uppercase tracking-wider text-dim">
           Queue ({d.queue.length}) — assigned by the team lead, by priority
@@ -381,6 +442,38 @@ function AgentDetailView({
           ))
         )}
       </div>
+        </>
+      ) : (
+        <div>
+          <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
+            Add context for {label(d.agent_type)}
+          </div>
+          <textarea
+            className="cyt-input min-h-[110px]"
+            value={ctxText}
+            onChange={(e) => setCtxText(e.target.value)}
+            placeholder="Anything this agent should know — goals, constraints, tone…"
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={saveContext}
+              disabled={ctxBusy || !ctxText.trim()}
+              className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-bold text-bg disabled:opacity-60"
+            >
+              {ctxBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+              Save context
+            </button>
+            {ctxMsg && (
+              <span
+                className={`text-[12px] ${ctxMsg.ok ? "text-good" : "text-bad"}`}
+              >
+                {ctxMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
