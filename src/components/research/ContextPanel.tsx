@@ -1,8 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, Upload, Users } from "lucide-react";
+import { Loader2, Save, Upload, Users, TrendingUp } from "lucide-react";
 import { cytapi, type TopicContext, type SectionItem } from "@/lib/api";
+
+const CATEGORY_OPTIONS = [
+  "Food & Drink",
+  "Retail & Ecommerce",
+  "Services",
+  "Tech & Apps",
+  "Creative & Media",
+  "Health & Wellness",
+  "Events",
+  "Education",
+];
+
+// Illustrative "typical early valuation" per space (rough, not market data).
+const CATEGORY_VALUATION: Record<string, number> = {
+  "Food & Drink": 750_000,
+  "Retail & Ecommerce": 1_200_000,
+  Services: 600_000,
+  "Tech & Apps": 3_500_000,
+  "Creative & Media": 900_000,
+  "Health & Wellness": 2_000_000,
+  Events: 500_000,
+  Education: 1_500_000,
+};
+
+const SAMPLE_GOALS = [
+  "Reach 100 paying customers in 90 days",
+  "Launch an MVP in 30 days",
+  "Hit $10k in monthly revenue",
+];
+
+function formatValuation(n: number): string {
+  return n >= 1_000_000
+    ? `~$${(n / 1_000_000).toFixed(1)}M`
+    : `~$${Math.round(n / 1000)}K`;
+}
 
 function Field({
   label,
@@ -23,9 +58,10 @@ function Field({
 }
 
 /**
- * Context tab — a survey/interview that captures the owner's project context
- * (goals, categories, target market, competitor notes, anything else), shows the
- * agent-generated competitor research, and (next) document uploads.
+ * Context tab — a survey/interview capturing the owner's project context
+ * (goals, category bubbles, target market, competitor notes, anything else),
+ * with a rough market valuation up top, the agent competitor research, and
+ * (next) document uploads.
  */
 export function ContextPanel({ topicId }: { topicId: string }) {
   const [ctx, setCtx] = useState<TopicContext>({});
@@ -60,6 +96,36 @@ export function ContextPanel({ topicId }: { topicId: string }) {
     setCtx((prev) => ({ ...prev, [k]: v }));
   }
 
+  // Categories are multi-select bubbles, persisted as a comma-joined string.
+  const selectedCats = new Set(
+    (ctx.categories ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  function toggleCat(c: string) {
+    const next = new Set(selectedCats);
+    if (next.has(c)) next.delete(c);
+    else next.add(c);
+    set("categories", [...next].join(", "));
+  }
+
+  function addGoal(g: string) {
+    setCtx((prev) => {
+      const cur = prev.goals ?? "";
+      if (cur.includes(g)) return prev;
+      return { ...prev, goals: cur ? `${cur.trimEnd()}\n${g}` : g };
+    });
+  }
+
+  // Rough valuation = average of the selected spaces (default ~$1M).
+  const vals = [...selectedCats]
+    .map((c) => CATEGORY_VALUATION[c])
+    .filter(Boolean);
+  const valuation = vals.length
+    ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+    : 1_000_000;
+
   async function save() {
     if (busy) return;
     setBusy(true);
@@ -90,12 +156,24 @@ export function ContextPanel({ topicId }: { topicId: string }) {
 
   return (
     <div className="space-y-4 p-4">
-      <div>
-        <h3 className="text-[15px] font-semibold">Context survey</h3>
-        <p className="text-[13px] text-mut">
-          The more your team knows about the project, the sharper the work. Fill
-          in what you can — update it anytime.
-        </p>
+      {/* Header — survey intro + rough market valuation top-right. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-[15px] font-semibold">Context survey</h3>
+          <p className="text-[13px] text-mut">
+            The more your team knows, the sharper the work. Fill in what you can.
+          </p>
+        </div>
+        <div className="shrink-0 rounded-xl border border-line bg-panel2 px-4 py-2.5 text-right">
+          <div className="flex items-center justify-end gap-1 text-[10.5px] uppercase tracking-wide text-mut">
+            <TrendingUp size={11} className="text-brand" /> Est. valuation in this
+            space
+          </div>
+          <div className="text-[19px] font-bold text-ink">
+            {formatValuation(valuation)}
+          </div>
+          <div className="text-[10.5px] text-dim">rough estimate</div>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -106,15 +184,43 @@ export function ContextPanel({ topicId }: { topicId: string }) {
             onChange={(e) => set("goals", e.target.value)}
             placeholder="e.g. reach 100 paying customers in 90 days"
           />
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] text-dim">Examples:</span>
+            {SAMPLE_GOALS.map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => addGoal(g)}
+                className="rounded-full border border-line px-2.5 py-1 text-[12px] text-mut transition-colors hover:text-ink"
+              >
+                + {g}
+              </button>
+            ))}
+          </div>
         </Field>
-        <Field label="Categories" hint="Comma-separated tags">
-          <input
-            className="cyt-input"
-            value={ctx.categories ?? ""}
-            onChange={(e) => set("categories", e.target.value)}
-            placeholder="e.g. events, retail, local delivery"
-          />
+
+        <Field label="Categories" hint="Pick any that fit">
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORY_OPTIONS.map((c) => {
+              const on = selectedCats.has(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleCat(c)}
+                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                    on
+                      ? "border-[#31384c] bg-panel2 text-ink"
+                      : "border-line text-mut hover:text-ink"
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
         </Field>
+
         <Field label="Target market" hint="Who is this for?">
           <textarea
             className="cyt-input min-h-[60px]"
@@ -139,6 +245,7 @@ export function ContextPanel({ topicId }: { topicId: string }) {
             placeholder="Constraints, brand voice, must-haves…"
           />
         </Field>
+
         <div className="flex items-center gap-3">
           <button
             onClick={save}
@@ -153,9 +260,7 @@ export function ContextPanel({ topicId }: { topicId: string }) {
             Save context
           </button>
           {msg && (
-            <span
-              className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}
-            >
+            <span className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
               {msg.text}
             </span>
           )}
