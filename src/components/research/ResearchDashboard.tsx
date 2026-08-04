@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { KpiTiles } from "@/components/research/KpiTiles";
 import { SectionTabs, CORE_SECTIONS } from "@/components/research/SectionTabs";
 import { LivingReport } from "@/components/research/LivingReport";
+import { ContextPanel } from "@/components/research/ContextPanel";
 import { CompetitorPanel } from "@/components/research/CompetitorPanel";
 import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
 import { DraftsPanel } from "@/components/research/DraftsPanel";
@@ -348,6 +349,7 @@ export function ResearchDashboard({
                     topicId={topicId}
                   />
                 )}
+                {active === "context" && <ContextPanel topicId={topicId} />}
                 {active === "competitors" && (
                   <CompetitorPanel topicId={topicId} />
                 )}

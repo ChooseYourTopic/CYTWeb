@@ -6,6 +6,7 @@ import type { SectionKey } from "@/lib/api";
 
 export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "overview", label: "Overview" },
+  { key: "context", label: "Context" },
   { key: "competitors", label: "Competitors" },
   { key: "market", label: "Market" },
   { key: "drafts", label: "Drafts" },
@@ -24,6 +25,7 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
  */
 export const CORE_SECTIONS: SectionKey[] = [
   "overview",
+  "context",
   "competitors",
   "market",
   "drafts",

@@ -173,6 +173,7 @@ export type FinanceSummary = {
 
 export type SectionKey =
   | "overview"
+  | "context"
   | "competitors"
   | "market"
   | "drafts"
@@ -303,6 +304,15 @@ export type PauseResult = {
   topic: MyTopic;
   soft_shutdown?: { already_paused: boolean; agents: number; held_tasks: number };
   resume?: { was_paused: boolean; restored_tasks: number };
+};
+
+/** Project context captured via the Context survey/interview. */
+export type TopicContext = {
+  goals?: string | null;
+  categories?: string | null;
+  target_market?: string | null;
+  competitor_notes?: string | null;
+  notes?: string | null;
 };
 
 export type MyTopicsResponse = {
@@ -591,6 +601,11 @@ export const cytapi = {
     client.post<PauseResult>(`/me/topics/${id}/pause`),
   resumeTopic: (id: string | number) =>
     client.post<PauseResult>(`/me/topics/${id}/resume`),
+  // Context survey/interview for a project (owner-scoped).
+  topicContext: (id: string | number) =>
+    client.get<{ context: TopicContext }>(`/me/topics/${id}/context`),
+  saveTopicContext: (id: string | number, patch: TopicContext) =>
+    client.put<{ context: TopicContext }>(`/me/topics/${id}/context`, patch),
   updateProfile: (patch: {
     name?: string | null;
     nickname?: string | null;
