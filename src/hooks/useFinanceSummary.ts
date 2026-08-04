@@ -12,6 +12,7 @@ import { useResearchStore } from "@/store/useResearchStore";
 export function useFinanceSummary(
   companyId?: string | number,
   pollIntervalMs = 20000,
+  enabled = true,
 ) {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,12 +34,17 @@ export function useFinanceSummary(
     };
 
     load();
+    if (!enabled) {
+      return () => {
+        cancelled.current = true;
+      };
+    }
     const interval = setInterval(load, pollIntervalMs);
     return () => {
       cancelled.current = true;
       clearInterval(interval);
     };
-  }, [companyId, pollIntervalMs, financeBump]);
+  }, [companyId, pollIntervalMs, financeBump, enabled]);
 
   return { summary, loading };
 }

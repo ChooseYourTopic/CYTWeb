@@ -13,6 +13,8 @@ import {
   Search,
   FolderOpen,
   Settings,
+  Pause,
+  Play,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -22,6 +24,7 @@ import {
   type MyTopic,
   type TopicReviewStatus,
 } from "@/lib/api";
+import { useIsProjectPaused, toggleProjectPaused } from "@/lib/pausedProjects";
 
 /** Visual treatment per review status. */
 const STATUS: Record<
@@ -57,7 +60,18 @@ function StatusBadge({ status }: { status: TopicReviewStatus }) {
   );
 }
 
+/** Amber pill shown in place of the review status when a project is paused. */
+function PausedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4a3b1a] bg-[#1c1708] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-warn">
+      <Pause size={12} />
+      Paused
+    </span>
+  );
+}
+
 function TopicCard({ t }: { t: MyTopic }) {
+  const paused = useIsProjectPaused(t.id);
   const pct =
     t.tasks_total > 0
       ? Math.round((t.tasks_completed / t.tasks_total) * 100)
@@ -65,14 +79,16 @@ function TopicCard({ t }: { t: MyTopic }) {
   return (
     <Link
       href={`/topic/${t.id}`}
-      className="group block rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-[#31384c]"
+      className={`group block rounded-2xl border bg-panel p-5 transition-all hover:border-[#31384c] ${
+        paused ? "border-[#4a3b1a] opacity-70 hover:opacity-100" : "border-line"
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-[16px] font-bold text-ink">{t.name}</h3>
           <p className="mt-1 line-clamp-2 text-[13px] text-mut">{t.topic}</p>
         </div>
-        <StatusBadge status={t.status} />
+        {paused ? <PausedBadge /> : <StatusBadge status={t.status} />}
       </div>
 
       <div className="mt-4 flex items-center gap-4 text-[12px] text-dim">
@@ -83,20 +99,47 @@ function TopicCard({ t }: { t: MyTopic }) {
           <span className="text-ink">{t.tasks_completed}</span>/{t.tasks_total}{" "}
           tasks
         </span>
-        {t.tasks_pending > 0 && (
+        {t.tasks_pending > 0 && !paused && (
           <span className="text-warn">{t.tasks_pending} in progress</span>
         )}
       </div>
 
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-panel2">
         <div
-          className="h-full rounded-full bg-brand transition-all"
+          className={`h-full rounded-full transition-all ${
+            paused ? "bg-dim" : "bg-brand"
+          }`}
           style={{ width: `${pct}%` }}
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-end text-[13px] text-brand opacity-0 transition-opacity group-hover:opacity-100">
-        Open dashboard <ArrowRight size={14} className="ml-1" />
+      <div className="mt-4 flex items-center justify-between">
+        {/* Pause / Resume — toggles without following the card link. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleProjectPaused(t.id);
+          }}
+          title={
+            paused
+              ? "Resume this project"
+              : "Pause this project — stops the live dashboard until you resume"
+          }
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
+            paused
+              ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
+              : "border-line bg-panel2 text-mut hover:text-ink"
+          }`}
+        >
+          {paused ? <Play size={12} /> : <Pause size={12} />}
+          {paused ? "Resume" : "Pause"}
+        </button>
+
+        <span className="flex items-center text-[13px] text-brand opacity-0 transition-opacity group-hover:opacity-100">
+          Open dashboard <ArrowRight size={14} className="ml-1" />
+        </span>
       </div>
     </Link>
   );

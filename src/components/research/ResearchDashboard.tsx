@@ -21,8 +21,12 @@ import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
+import {
+  useIsProjectPaused,
+  toggleProjectPaused,
+} from "@/lib/pausedProjects";
 import Link from "next/link";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Pause, Play } from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
 function RunModeBadge({
@@ -61,6 +65,35 @@ function RunModeBadge({
   );
 }
 
+/** Pause / Resume the whole project from the topic header. */
+function ProjectPauseToggle({
+  topicId,
+  paused,
+}: {
+  topicId: string;
+  paused: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => toggleProjectPaused(topicId)}
+      title={
+        paused
+          ? "Resume this project — restart the live dashboard"
+          : "Pause this project — stop the live dashboard until you resume"
+      }
+      className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+        paused
+          ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
+          : "border-line bg-panel2 text-mut hover:text-ink"
+      }`}
+    >
+      {paused ? <Play size={14} /> : <Pause size={14} />}
+      <span className="hidden sm:inline">{paused ? "Resume" : "Pause"}</span>
+    </button>
+  );
+}
+
 /**
  * The living research dashboard: KPI row, a tabbed report canvas that fills in
  * progressively, and an always-on investigation rail (live feed + agents).
@@ -76,14 +109,18 @@ export function ResearchDashboard({
 }) {
   const active = useResearchStore((s) => s.activeSection);
 
+  // Paused projects halt all live polling and show a paused state until resumed.
+  const paused = useIsProjectPaused(topicId);
+
   const { data: overview, loading } = useSectionData<TopicOverview>(
     "overview",
     () => cytapi.topicOverview(topicId),
     20000,
+    !paused,
   );
 
   // Real per-company financials (incl. AI spend) for the spend KPI tile.
-  const { summary: finance } = useFinanceSummary(topicId);
+  const { summary: finance } = useFinanceSummary(topicId, 20000, !paused);
 
   // Reset the tab to Overview whenever the topic changes.
   const setActive = useResearchStore((s) => s.setActiveSection);
@@ -113,16 +150,19 @@ export function ResearchDashboard({
           {BRAND.APP_NAME}
         </a>
 
-        {/* Back to the home profile to browse or search for other topics */}
-        <Link
-          href="/dashboard"
-          title="Back to your topics — start or search for another topic"
-          className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
-        >
-          <ArrowLeft size={14} />
-          <span className="hidden sm:inline">Your topics</span>
-          <Search size={13} className="opacity-70" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <ProjectPauseToggle topicId={topicId} paused={paused} />
+          {/* Back to the home profile to browse or search for other topics */}
+          <Link
+            href="/dashboard"
+            title="Back to your topics — start or search for another topic"
+            className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden sm:inline">Your topics</span>
+            <Search size={13} className="opacity-70" />
+          </Link>
+        </div>
       </header>
 
       {/* Topic header */}
@@ -146,38 +186,69 @@ export function ResearchDashboard({
         </div>
       </div>
 
-      <KpiTiles
-        overview={overview}
-        finance={finance}
-        findings={Number(findings)}
-        loading={loading}
-      />
-
-      {/* Canvas + investigation rail */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+      {paused ? (
+        /* Paused: no KPI row, no panels, no rail — so every live hook unmounts
+           and polling fully stops until the user resumes. */
         <Card>
-          <SectionTabs />
-          <div>
-            {active === "overview" && (
-              <LivingReport overview={overview} loading={loading} />
-            )}
-            {active === "competitors" && (
-              <CompetitorPanel topicId={topicId} />
-            )}
-            {active === "market" && <MarketSignalsPanel topicId={topicId} />}
-            {active === "drafts" && <DraftsPanel topicId={topicId} />}
-            {active === "outreach" && <OutreachPanel topicId={topicId} />}
-            {active === "support" && <SupportPanel topicId={topicId} />}
-            {active === "ads" && <AdsPanel topicId={topicId} />}
-            {active === "build" && <BuildPanel topicId={topicId} />}
-            {active === "finance" && <FinancePanel topicId={topicId} />}
-            {active === "decisions" && <DecisionsPanel />}
-            {active === "report" && <ReportArtifact />}
+          <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-full border border-[#4a3b1a] bg-[#1c1708] text-warn">
+              <Pause size={24} />
+            </span>
+            <div>
+              <h3 className="text-[18px] font-bold text-ink">Project paused</h3>
+              <p className="mx-auto mt-1 max-w-[420px] text-[14px] text-mut">
+                The live dashboard for{" "}
+                <span className="text-ink">{topicName}</span> has stopped
+                refreshing. Your findings so far are saved — resume any time to
+                pick the investigation back up.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleProjectPaused(topicId)}
+              className="cyt-gradient-bg mt-1 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg"
+            >
+              <Play size={16} strokeWidth={2.5} />
+              Resume project
+            </button>
           </div>
         </Card>
+      ) : (
+        <>
+          <KpiTiles
+            overview={overview}
+            finance={finance}
+            findings={Number(findings)}
+            loading={loading}
+          />
 
-        <InvestigationRail companyId={topicId} />
-      </div>
+          {/* Canvas + investigation rail */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+            <Card>
+              <SectionTabs />
+              <div>
+                {active === "overview" && (
+                  <LivingReport overview={overview} loading={loading} />
+                )}
+                {active === "competitors" && (
+                  <CompetitorPanel topicId={topicId} />
+                )}
+                {active === "market" && <MarketSignalsPanel topicId={topicId} />}
+                {active === "drafts" && <DraftsPanel topicId={topicId} />}
+                {active === "outreach" && <OutreachPanel topicId={topicId} />}
+                {active === "support" && <SupportPanel topicId={topicId} />}
+                {active === "ads" && <AdsPanel topicId={topicId} />}
+                {active === "build" && <BuildPanel topicId={topicId} />}
+                {active === "finance" && <FinancePanel topicId={topicId} />}
+                {active === "decisions" && <DecisionsPanel />}
+                {active === "report" && <ReportArtifact />}
+              </div>
+            </Card>
+
+            <InvestigationRail companyId={topicId} />
+          </div>
+        </>
+      )}
     </main>
   );
 }

@@ -16,6 +16,7 @@ export function useSectionData<T>(
   section: SectionKey,
   loader: Loader<T>,
   pollIntervalMs = 20000,
+  enabled = true,
 ) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,18 +43,26 @@ export function useSectionData<T>(
 
   useEffect(() => {
     cancelled.current = false;
+    // Always do one load so a paused view can still show last-known data;
+    // only set up recurring polling while enabled.
     load();
+    if (!enabled) {
+      return () => {
+        cancelled.current = true;
+      };
+    }
     const interval = setInterval(load, pollIntervalMs);
     return () => {
       cancelled.current = true;
       clearInterval(interval);
     };
-  }, [load, pollIntervalMs]);
+  }, [load, pollIntervalMs, enabled]);
 
-  // Refetch when new findings for this section arrive over the socket.
+  // Refetch when new findings for this section arrive over the socket
+  // (ignored while paused).
   useEffect(() => {
-    if (newCount > 0) load();
-  }, [newCount, load]);
+    if (enabled && newCount > 0) load();
+  }, [newCount, load, enabled]);
 
   return { data, loading, error, refetch: load };
 }
