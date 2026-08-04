@@ -92,6 +92,14 @@ const CATALOG: { category: string; ideas: string[] }[] = [
       "an app that matches homeowners with local muralists",
     ],
   },
+  {
+    category: "Games, Trivia & Puzzles",
+    ideas: [
+      "a mobile trivia app with real cash prizes",
+      "a subscription box of indie tabletop games",
+      "a daily puzzle app for word-game lovers",
+    ],
+  },
 ];
 
 export default function ChoosePage() {
