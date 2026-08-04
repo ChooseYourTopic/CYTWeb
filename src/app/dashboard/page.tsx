@@ -296,8 +296,11 @@ export default function DashboardPage() {
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
                 <span className="font-mono text-mut">{me.account_number}</span>
                 {me.license && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2 py-0.5 text-[11px] uppercase tracking-wide text-mut">
-                    {me.license.tier} license
+                  <span className="inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2 py-0.5 text-[11px] text-mut">
+                    {me.license.label ?? me.license.type}
+                    {me.license.id && (
+                      <span className="font-mono text-dim"> · {me.license.id}</span>
+                    )}
                     {me.license.status !== "active" && (
                       <span className="text-warn"> · {me.license.status}</span>
                     )}

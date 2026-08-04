@@ -240,7 +240,7 @@ function ProfileCard({ me }: { me: MeProfile }) {
               className="cyt-input opacity-60"
               value={
                 me.license
-                  ? `${me.license.tier}${me.license.status !== "active" ? ` (${me.license.status})` : ""}`
+                  ? `${me.license.label ?? me.license.type}${me.license.id ? ` · ${me.license.id}` : ""}${me.license.status !== "active" ? ` (${me.license.status})` : ""}`
                   : "—"
               }
               readOnly

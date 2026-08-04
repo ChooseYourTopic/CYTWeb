@@ -289,8 +289,18 @@ export type UserPreferences = {
   social_handle: string | null;
 };
 
+export type LicenseType =
+  | "standard"
+  | "business_owner"
+  | "advertiser"
+  | "support"
+  | "admin";
+
 export type License = {
-  tier: string; // free | starter | pro
+  // The license id (branded, e.g. "CYT-LIC-000123").
+  id: string | null;
+  type: LicenseType | string;
+  label?: string; // human label, e.g. "Business owner"
   status: string; // active | suspended | expired
   since: string | null;
 };
@@ -599,8 +609,7 @@ export type AdminUserRow = {
   phone: string | null;
   is_admin: boolean;
   is_support: boolean;
-  license_tier: string | null;
-  license_status: string | null;
+  license: License;
   companies: number;
   created_at: string | null;
 };
@@ -829,7 +838,7 @@ export const cytapi = {
       client.post<{ id: number; is_admin: boolean }>(`/admin/users/${id}/admin`, { grant }),
     setSupport: (id: number, grant: boolean) =>
       client.post<{ id: number; is_support: boolean }>(`/admin/users/${id}/support`, { grant }),
-    setLicense: (id: number, payload: { tier?: string; status?: string }) =>
+    setLicense: (id: number, payload: { type?: string; status?: string }) =>
       client.post<{ id: number; license: License }>(`/admin/users/${id}/license`, payload),
 
     // Support queue.

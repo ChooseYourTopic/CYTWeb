@@ -852,10 +852,10 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function changeLicense(u: AdminUserRow, tier: string) {
+  async function changeLicense(u: AdminUserRow, type: string) {
     setBusyId(u.id);
     try {
-      await cytapi.admin.setLicense(u.id, { tier });
+      await cytapi.admin.setLicense(u.id, { type });
       await load();
     } finally {
       setBusyId(null);
@@ -907,25 +907,32 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
                 </div>
               </Td>
               <Td>
-                {isAdmin ? (
-                  <select
-                    className="cyt-input h-8 min-w-[92px] py-1 text-[12px] disabled:opacity-50"
-                    value={u.license_tier ?? "free"}
-                    disabled={busyId === u.id}
-                    onChange={(e) => changeLicense(u, e.target.value)}
-                  >
-                    <option value="free">Free</option>
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                  </select>
-                ) : (
-                  <Chip className="border-line bg-panel2 uppercase text-mut">
-                    {u.license_tier ?? "free"}
-                  </Chip>
-                )}
-                {u.license_status && u.license_status !== "active" && (
-                  <span className="ml-1 text-[11px] text-warn">{u.license_status}</span>
-                )}
+                <div className="flex flex-col gap-0.5">
+                  {isAdmin ? (
+                    <select
+                      className="cyt-input h-8 min-w-[130px] py-1 text-[12px] disabled:opacity-50"
+                      value={u.license?.type ?? "standard"}
+                      disabled={busyId === u.id}
+                      onChange={(e) => changeLicense(u, e.target.value)}
+                    >
+                      <option value="standard">Standard user</option>
+                      <option value="business_owner">Business owner</option>
+                      <option value="advertiser">Advertiser</option>
+                      <option value="support">Support agent</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  ) : (
+                    <Chip className="border-line bg-panel2 text-mut">
+                      {u.license?.label ?? u.license?.type ?? "Standard user"}
+                    </Chip>
+                  )}
+                  <span className="font-mono text-[11px] text-dim">
+                    {u.license?.id ?? "—"}
+                    {u.license?.status && u.license.status !== "active" && (
+                      <span className="ml-1 text-warn">· {u.license.status}</span>
+                    )}
+                  </span>
+                </div>
               </Td>
               <Td className="text-right text-mut">{num(u.companies)}</Td>
               <Td className="text-dim">{relTime(u.created_at)}</Td>
