@@ -59,23 +59,23 @@ export function SectionTabs() {
       {visible.map(({ key, label }) => {
         const n = newCounts[key] ?? 0;
         const isActive = key === active;
+        // New results highlight the whole tab in the brand light-blue instead of
+        // showing a count badge.
+        const hasNew = n > 0 && !isActive;
         return (
           <button
             key={key}
             onClick={() => setActive(key)}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px]",
+              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] transition-colors",
               isActive
                 ? "border-line bg-panel2 text-ink"
-                : "border-transparent text-mut hover:text-ink",
+                : hasNew
+                  ? "border-brand/60 bg-brand/15 text-brand"
+                  : "border-transparent text-mut hover:text-ink",
             )}
           >
             {label}
-            {n > 0 && !isActive && (
-              <span className="rounded-full bg-brand px-1.5 text-[10px] font-semibold text-bg">
-                {n}
-              </span>
-            )}
           </button>
         );
       })}
