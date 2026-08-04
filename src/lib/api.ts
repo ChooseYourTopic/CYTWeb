@@ -175,6 +175,7 @@ export type SectionKey =
   | "overview"
   | "context"
   | "integrations"
+  | "models"
   | "competitors"
   | "market"
   | "drafts"

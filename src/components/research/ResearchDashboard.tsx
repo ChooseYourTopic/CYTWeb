@@ -7,6 +7,7 @@ import { SectionTabs, CORE_SECTIONS } from "@/components/research/SectionTabs";
 import { LivingReport } from "@/components/research/LivingReport";
 import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
+import { ModelsPanel } from "@/components/research/ModelsPanel";
 import { CompetitorPanel } from "@/components/research/CompetitorPanel";
 import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
 import { DraftsPanel } from "@/components/research/DraftsPanel";
@@ -352,6 +353,7 @@ export function ResearchDashboard({
                 )}
                 {active === "context" && <ContextPanel topicId={topicId} />}
                 {active === "integrations" && <IntegrationsPanel />}
+                {active === "models" && <ModelsPanel />}
                 {active === "competitors" && (
                   <CompetitorPanel topicId={topicId} />
                 )}
