@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SectionKey } from "@/lib/api";
+import type { SectionKey, ViewMode } from "@/lib/api";
 
 type NewCounts = Partial<Record<SectionKey, number>>;
 
@@ -10,12 +10,15 @@ type ResearchState = {
   newCounts: NewCounts;
   // Highest activity event id we've observed (for reconnect backfill).
   lastSeq: number;
+  // Dashboard density: standard = core five tabs, advanced = every tab.
+  viewMode: ViewMode;
 
   setActiveSection: (s: SectionKey) => void;
   setWsConnected: (c: boolean) => void;
   bumpSection: (s: SectionKey, n?: number) => void;
   markSectionRead: (s: SectionKey) => void;
   setLastSeq: (n: number) => void;
+  setViewMode: (m: ViewMode) => void;
 };
 
 export const useResearchStore = create<ResearchState>((set) => ({
@@ -23,6 +26,7 @@ export const useResearchStore = create<ResearchState>((set) => ({
   wsConnected: false,
   newCounts: {},
   lastSeq: 0,
+  viewMode: "standard",
 
   setActiveSection: (s) =>
     set((state) => ({
@@ -46,4 +50,6 @@ export const useResearchStore = create<ResearchState>((set) => ({
 
   setLastSeq: (n) =>
     set((state) => ({ lastSeq: Math.max(state.lastSeq, n) })),
+
+  setViewMode: (m) => set({ viewMode: m }),
 }));

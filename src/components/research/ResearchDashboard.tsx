@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { KpiTiles } from "@/components/research/KpiTiles";
-import { SectionTabs } from "@/components/research/SectionTabs";
+import { SectionTabs, CORE_SECTIONS } from "@/components/research/SectionTabs";
 import { LivingReport } from "@/components/research/LivingReport";
 import { CompetitorPanel } from "@/components/research/CompetitorPanel";
 import { MarketSignalsPanel } from "@/components/research/MarketSignalsPanel";
@@ -99,6 +99,41 @@ function ProjectPauseToggle({
   );
 }
 
+/** Standard / Expert view switch — collapses or reveals the per-agent tabs. */
+function ViewModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: "standard" | "advanced";
+  onChange: (m: "standard" | "advanced") => void;
+}) {
+  const opts: { key: "standard" | "advanced"; label: string }[] = [
+    { key: "standard", label: "Standard" },
+    { key: "advanced", label: "Expert" },
+  ];
+  return (
+    <div
+      className="flex rounded-xl border border-line bg-panel2 p-0.5"
+      title="Standard shows the core tabs; Expert reveals every per-agent tab"
+    >
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => onChange(o.key)}
+          className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
+            mode === o.key
+              ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+              : "text-mut hover:text-ink"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The living research dashboard: KPI row, a tabbed report canvas that fills in
  * progressively, and an always-on investigation rail (live feed + agents).
@@ -162,6 +197,41 @@ export function ResearchDashboard({
     setActive("overview");
   }, [topicId, setActive]);
 
+  // Standard vs Expert view — seeded from the user's saved preference.
+  const viewMode = useResearchStore((s) => s.viewMode);
+  const setViewMode = useResearchStore((s) => s.setViewMode);
+  useEffect(() => {
+    let cancelled = false;
+    cytapi
+      .me()
+      .then((me) => {
+        if (!cancelled && me.preferences?.view_mode) {
+          setViewMode(me.preferences.view_mode);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setViewMode]);
+
+  // If the active tab is hidden in Standard view, fall back to Overview.
+  useEffect(() => {
+    if (viewMode === "standard" && !CORE_SECTIONS.includes(active)) {
+      setActive("overview");
+    }
+  }, [viewMode, active, setActive]);
+
+  async function changeViewMode(next: "standard" | "advanced") {
+    if (next === viewMode) return;
+    setViewMode(next); // optimistic
+    try {
+      await cytapi.updatePreferences({ view_mode: next });
+    } catch {
+      // keep the optimistic value; it re-syncs from the server on next load
+    }
+  }
+
   const topicName = overview?.topic ?? fallbackTopic ?? "Your topic";
   const tagline =
     overview?.tagline ??
@@ -185,6 +255,7 @@ export function ResearchDashboard({
         </a>
 
         <div className="flex items-center gap-2">
+          <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
           <ProjectPauseToggle
             paused={paused}
             busy={pauseBusy}

@@ -252,10 +252,14 @@ export type CreateTopicResponse = { topic_id: string | number };
 
 /* ------------------------- Signed-in user (me) ---------------------------- */
 
+export type ViewMode = "standard" | "advanced";
+
 export type UserPreferences = {
   timezone: string | null;
   daily_budget_usd: number | null;
   platform_daily_budget_usd: number;
+  // Dashboard density: standard = core five tabs, advanced = every tab.
+  view_mode: ViewMode;
 };
 
 export type MeProfile = {
@@ -588,6 +592,7 @@ export const cytapi = {
   updatePreferences: (patch: {
     timezone?: string | null;
     daily_budget_usd?: number | null;
+    view_mode?: ViewMode;
   }) => client.put<UserPreferences>("/me/preferences", patch),
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the

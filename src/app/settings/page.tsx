@@ -20,6 +20,7 @@ import {
   ApiError,
   type MeProfile,
   type AiCredential,
+  type ViewMode,
 } from "@/lib/api";
 
 const TIMEZONES = [
@@ -218,6 +219,9 @@ function PreferencesCard({ me }: { me: MeProfile }) {
   const [budget, setBudget] = useState(
     prefs?.daily_budget_usd != null ? String(prefs.daily_budget_usd) : "",
   );
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    prefs?.view_mode ?? "standard",
+  );
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -232,6 +236,7 @@ function PreferencesCard({ me }: { me: MeProfile }) {
       await cytapi.updatePreferences({
         timezone: tz || null,
         daily_budget_usd: trimmed === "" ? null : Number(trimmed),
+        view_mode: viewMode,
       });
       setMsg({ ok: true, text: "Saved." });
     } catch {
@@ -272,6 +277,30 @@ function PreferencesCard({ me }: { me: MeProfile }) {
             onChange={(e) => setBudget(e.target.value)}
             placeholder={`Default (${platformCap})`}
           />
+        </Field>
+        <Field label="Dashboard view — how many tabs each topic shows">
+          <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
+            {(
+              [
+                { key: "standard", label: "Standard", hint: "Core five tabs" },
+                { key: "advanced", label: "Expert", hint: "Every tab" },
+              ] as { key: ViewMode; label: string; hint: string }[]
+            ).map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setViewMode(o.key)}
+                className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                  viewMode === o.key
+                    ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+                    : "text-mut hover:text-ink"
+                }`}
+              >
+                {o.label}
+                <span className="text-[11px] font-normal text-dim">{o.hint}</span>
+              </button>
+            ))}
+          </div>
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">

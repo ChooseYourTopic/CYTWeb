@@ -19,6 +19,18 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
 ];
 
 /**
+ * The core five tabs that ship with the base ChooseYourTopic experience
+ * (Standard view). Expert/Advanced view reveals every tab in SECTIONS.
+ */
+export const CORE_SECTIONS: SectionKey[] = [
+  "overview",
+  "competitors",
+  "market",
+  "drafts",
+  "report",
+];
+
+/**
  * Tabbed report canvas switcher with a per-tab "new results" badge fed by the
  * research store (WS bumps the counter; clicking a tab flushes it).
  */
@@ -26,10 +38,17 @@ export function SectionTabs() {
   const active = useResearchStore((s) => s.activeSection);
   const newCounts = useResearchStore((s) => s.newCounts);
   const setActive = useResearchStore((s) => s.setActiveSection);
+  const viewMode = useResearchStore((s) => s.viewMode);
+
+  // Standard view shows only the core five; advanced reveals every tab.
+  const visible =
+    viewMode === "advanced"
+      ? SECTIONS
+      : SECTIONS.filter((s) => CORE_SECTIONS.includes(s.key));
 
   return (
     <div className="flex flex-wrap gap-1 border-b border-line px-3 py-2.5">
-      {SECTIONS.map(({ key, label }) => {
+      {visible.map(({ key, label }) => {
         const n = newCounts[key] ?? 0;
         const isActive = key === active;
         return (
