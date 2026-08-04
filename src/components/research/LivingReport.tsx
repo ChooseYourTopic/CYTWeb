@@ -11,6 +11,7 @@ import {
   Loader2,
   X,
   CheckCircle2,
+  Gauge,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
 import { cytapi, ApiError, type TopicOverview } from "@/lib/api";
@@ -230,6 +231,32 @@ export function LivingReport({
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Accelerate-now (invoke orchestrator) menu state.
+  const [accelOpen, setAccelOpen] = useState(false);
+  const [accelBusy, setAccelBusy] = useState(false);
+  const [accelMsg, setAccelMsg] = useState<string | null>(null);
+
+  async function invokeOrchestrator(intent: "run" | "plan" | "review") {
+    if (!topicId || accelBusy) return;
+    setAccelBusy(true);
+    setAccelMsg(null);
+    try {
+      await cytapi.agentTrigger("orchestrator", topicId);
+      setAccelMsg(
+        intent === "plan"
+          ? "Orchestrator invoked — re-planning the project."
+          : intent === "review"
+            ? "Orchestrator invoked — reviewing progress."
+            : "Orchestrator invoked — accelerating now.",
+      );
+      setAccelOpen(false);
+    } catch {
+      setAccelMsg("Couldn't invoke the orchestrator. Please try again.");
+    } finally {
+      setAccelBusy(false);
+    }
+  }
+
   function openTier(tier: Tier) {
     setPendingTier(tier);
     setSubmitting(false);
@@ -267,8 +294,58 @@ export function LivingReport({
 
   return (
     <div className="space-y-3 p-4">
-      {/* Effort presets — each activates a task (confirmed in a cost modal). */}
-      <div className="flex flex-wrap justify-end gap-1.5">
+      {/* Effort presets — each activates a task (confirmed in a cost modal).
+          "Accelerate now" (to the left) invokes the orchestrator directly. */}
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <div className="relative mr-auto">
+          <button
+            type="button"
+            onClick={() => setAccelOpen((o) => !o)}
+            disabled={accelBusy}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#1f3d2e] bg-[#0e1c16] px-2.5 py-1.5 text-[12px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-60"
+          >
+            {accelBusy ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Gauge size={13} />
+            )}
+            Accelerate now
+            <ChevronDown size={12} />
+          </button>
+          {accelOpen && (
+            <div className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-panel shadow-xl">
+              <div className="border-b border-line px-3 py-2 text-[11px] uppercase tracking-wide text-dim">
+                Invoke the orchestrator
+              </div>
+              <button
+                type="button"
+                onClick={() => invokeOrchestrator("run")}
+                className="block w-full px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-panel2"
+              >
+                Run the orchestrator now
+              </button>
+              <button
+                type="button"
+                onClick={() => invokeOrchestrator("plan")}
+                className="block w-full px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-panel2"
+              >
+                Re-plan the project
+              </button>
+              <button
+                type="button"
+                onClick={() => invokeOrchestrator("review")}
+                className="block w-full px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-panel2"
+              >
+                Review &amp; prioritize
+              </button>
+            </div>
+          )}
+          {accelMsg && (
+            <div className="absolute left-0 top-full mt-1 whitespace-nowrap text-[11.5px] text-good">
+              {accelMsg}
+            </div>
+          )}
+        </div>
         {TIERS.map((t) => (
           <button
             key={t.key}
