@@ -12,6 +12,7 @@ import {
   type BusinessExperience,
   type SocialPlatform,
 } from "@/lib/api";
+import { TOPIC_CATALOG } from "@/lib/topicIdeas";
 
 type Clarity = "know" | "idea";
 type YesNo = "yes" | "no";
@@ -67,6 +68,7 @@ export default function StartPage() {
   );
   const [socialHandle, setSocialHandle] = useState("");
   const [topic, setTopic] = useState("");
+  const [ideaCat, setIdeaCat] = useState<string>(TOPIC_CATALOG[0].category);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,8 +90,8 @@ export default function StartPage() {
     setStep(2);
   }
 
-  async function start() {
-    const t = topic.trim();
+  async function start(override?: string) {
+    const t = (override ?? topic).trim();
     if (!t || busy) return;
     setBusy(true);
     setError(null);
@@ -257,28 +259,17 @@ export default function StartPage() {
             </button>
 
             {clarity === "idea" ? (
-              <>
-                <h1 className="text-[26px] font-bold tracking-[-0.5px]">
-                  Let&apos;s find your idea
-                </h1>
-                <p className="text-[14px] text-mut">
-                  Not sure yet? Browse ideas by category and pick one to start.
-                </p>
-                <Link
-                  href="/choose"
-                  className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg"
-                >
-                  <Sparkles size={16} /> Browse topic ideas
-                </Link>
-                <div className="pt-1 text-[13px] text-dim">
-                  — or type your own —
-                </div>
-              </>
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
+                Let&apos;s find your idea
+              </h1>
             ) : (
               <h1 className="text-[26px] font-bold tracking-[-0.5px]">
                 What do you want to build?
               </h1>
             )}
+            <p className="text-[14px] text-mut">
+              Type your topic, or pick one of the ideas below.
+            </p>
 
             <div className="flex gap-2">
               <input
@@ -291,7 +282,7 @@ export default function StartPage() {
                 }}
               />
               <button
-                onClick={start}
+                onClick={() => start()}
                 disabled={busy || !topic.trim()}
                 className="cyt-gradient-bg flex shrink-0 items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg disabled:opacity-60"
               >
@@ -304,6 +295,52 @@ export default function StartPage() {
               </button>
             </div>
             {error && <p className="text-[13px] text-bad">{error}</p>}
+
+            {/* Categories + suggestions to help them get started. */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[13px] font-semibold text-mut">
+                  Or pick from ideas
+                </div>
+                <Link
+                  href="/choose"
+                  className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand hover:underline"
+                >
+                  <Sparkles size={12} /> See all
+                </Link>
+              </div>
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {TOPIC_CATALOG.map((c) => (
+                  <button
+                    key={c.category}
+                    type="button"
+                    onClick={() => setIdeaCat(c.category)}
+                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                      ideaCat === c.category
+                        ? "border-[#31384c] bg-panel2 text-ink"
+                        : "border-line text-mut hover:text-ink"
+                    }`}
+                  >
+                    {c.category}
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  TOPIC_CATALOG.find((c) => c.category === ideaCat)?.ideas ?? []
+                ).map((idea) => (
+                  <button
+                    key={idea}
+                    type="button"
+                    onClick={() => start(idea)}
+                    disabled={busy}
+                    className="flex items-center gap-2 rounded-xl border border-line bg-panel p-3 text-left text-[13px] text-ink transition-colors hover:border-[#31384c] disabled:opacity-60"
+                  >
+                    <Plus size={14} className="shrink-0 text-brand" /> {idea}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </section>
