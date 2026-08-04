@@ -22,7 +22,11 @@ export function InvestigationRail({
       <Card>
         <CardHeader>Live investigation</CardHeader>
         <div className="p-2">
-          <ActivityFeed companyId={companyId} />
+          <ActivityFeed
+            companyId={companyId}
+            limit={6}
+            viewAllHref={companyId ? `/topic/${companyId}/activity` : undefined}
+          />
         </div>
       </Card>
     </div>
