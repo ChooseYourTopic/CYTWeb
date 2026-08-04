@@ -275,10 +275,7 @@ export default function DashboardPage() {
       <section className="mx-auto mt-12 max-w-[860px]">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-[28px] font-bold tracking-[-0.5px]">
-              Your topics
-            </h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[14px] text-mut">
+            <p className="flex flex-wrap items-center gap-x-1.5 text-[14px] text-mut">
               {me?.display_name ? (
                 <>
                   Signed in as{" "}
@@ -293,15 +290,6 @@ export default function DashboardPage() {
                 </>
               ) : (
                 "Every topic you've started and how its review is going."
-              )}
-              {me?.joined_at && (
-                <span className="text-dim">
-                  · Member since{" "}
-                  {new Date(me.joined_at).toLocaleDateString(undefined, {
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
               )}
             </p>
           </div>

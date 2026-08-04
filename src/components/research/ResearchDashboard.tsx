@@ -25,6 +25,7 @@ import { BuildPanel } from "@/components/research/BuildPanel";
 import { InvestigationRail } from "@/components/research/InvestigationRail";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFinanceSummary } from "@/hooks/useFinanceSummary";
+import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
@@ -198,6 +199,19 @@ export function ResearchDashboard({
   // Real per-company financials (incl. AI spend) for the spend KPI tile.
   const { summary: finance } = useFinanceSummary(topicId, 20000, !paused);
 
+  // Drive the "agents active" KPI from the SAME live status the agent-team
+  // lights use, so the count and the lights never disagree. Active = an agent
+  // running right now or with queued work; all idle => 0.
+  const { statuses: agentStatuses } = useAgentStatus(topicId, 20000, !paused);
+  const activeAgents = agentStatuses.filter((s) => {
+    const st = (s.last_run_status ?? "").toLowerCase();
+    return (
+      st === "running" ||
+      st === "in_progress" ||
+      (s.tasks_pending ?? 0) > 0
+    );
+  }).length;
+
   // Reset the tab to Overview whenever the topic changes.
   const setActive = useResearchStore((s) => s.setActiveSection);
   useEffect(() => {
@@ -340,6 +354,7 @@ export function ResearchDashboard({
             overview={overview}
             finance={finance}
             findings={Number(findings)}
+            activeAgents={activeAgents}
             loading={loading}
           />
 

@@ -17,11 +17,14 @@ export function KpiTiles({
   overview,
   finance,
   findings,
+  activeAgents,
   loading,
 }: {
   overview: TopicOverview | null;
   finance: FinanceSummary | null;
   findings: number;
+  // Live count of agents actually working/queued now (from useAgentStatus).
+  activeAgents?: number;
   loading: boolean;
 }) {
   const k = overview?.kpis ?? {};
@@ -50,8 +53,8 @@ export function KpiTiles({
     },
     {
       label: "Agents active",
-      value: `${k.active_agents ?? 0}/${totalAgents}`,
-      sub: "working now",
+      value: `${activeAgents ?? 0}/${totalAgents}`,
+      sub: (activeAgents ?? 0) > 0 ? "working now" : "all idle",
     },
     {
       label: "Est. spend",

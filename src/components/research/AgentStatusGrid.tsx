@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { ArrowUpCircle, Loader2, Play } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
-import { cn, label } from "@/lib/utils";
+import { cn, label, timeAgo } from "@/lib/utils";
 import {
   cytapi,
   type AgentStatus,
@@ -116,7 +116,9 @@ export function AgentStatusGrid({
               <span className="shrink-0 text-[12px] text-dim">
                 {s?.tasks_pending
                   ? `${s.tasks_pending} queued`
-                  : (AGENT_DESC[id] ?? "")}
+                  : s?.last_run_at
+                    ? `last commit ${timeAgo(s.last_run_at)}`
+                    : (AGENT_DESC[id] ?? "")}
               </span>
             </button>
           );
