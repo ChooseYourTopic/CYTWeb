@@ -301,6 +301,9 @@ export type MeProfile = {
   // Whether the user has a login password set (phone-first users start without one).
   has_password?: boolean;
   is_admin: boolean;
+  // Support-team member (admin-portal support queue); staff = admin OR support.
+  is_support?: boolean;
+  is_staff?: boolean;
   topics_count: number;
   joined_at: string | null;
   preferences?: UserPreferences;
@@ -515,6 +518,101 @@ function cq(companyId?: string | number): string {
   return companyId ? `?company_id=${companyId}` : "";
 }
 
+/* -------------------------- Support desk + admin portal -------------------- */
+
+export type TicketStatus = "open" | "pending" | "resolved" | "closed";
+export type TicketPriority = "low" | "normal" | "high" | "urgent";
+
+export type TicketUser = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+export type SupportTicket = {
+  id: number;
+  subject: string;
+  category: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  user?: TicketUser | null;
+  company?: { id: number; name: string } | null;
+  assignee?: { id: number; name: string | null } | null;
+  messages_count: number;
+  last_activity_at: string | null;
+  created_at: string | null;
+  resolved_at?: string | null;
+};
+
+export type TicketMessage = {
+  id: number;
+  author_role: "user" | "support" | "system";
+  author_name?: string;
+  body: string;
+  created_at: string | null;
+};
+
+export type TicketThread = { ticket: SupportTicket; messages: TicketMessage[] };
+
+export type QueueCounts = {
+  open: number;
+  pending: number;
+  unassigned: number;
+  mine: number;
+  resolved_today: number;
+};
+
+export type StaffWhoami = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  is_admin: boolean;
+  is_support: boolean;
+  role: "admin" | "support";
+};
+
+export type AdminOverview = {
+  companies: number;
+  users: number;
+  admins: number;
+  tasks: { total: number; pending: number; in_progress: number; completed: number; failed: number };
+  agent_runs: { total: number; today: number; failed_today: number };
+  spend: { today_usd: number; all_time_usd: number; tokens_today: number };
+  mode: { agent_mock: boolean; sandbox: boolean; daily_budget_usd: number };
+};
+
+export type AdminUserRow = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  is_admin: boolean;
+  is_support: boolean;
+  companies: number;
+  created_at: string | null;
+};
+
+export type AdminCompanyRow = {
+  id: number;
+  name: string;
+  topic: string | null;
+  industry: string | null;
+  created_at: string | null;
+  owner: { id: number; name: string | null; email: string | null; phone: string | null } | null;
+  tasks: number;
+  agent_runs: number;
+  spend_usd: number;
+};
+
+export type SupportAgentRow = {
+  id: number;
+  name: string;
+  is_admin: boolean;
+  is_support: boolean;
+  open_assigned: number;
+};
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -614,9 +712,13 @@ export const cytapi = {
         code,
       }),
     session: () =>
-      client.get<{ authenticated: boolean; phone?: string; is_admin?: boolean }>(
-        "/auth/session",
-      ),
+      client.get<{
+        authenticated: boolean;
+        phone?: string;
+        is_admin?: boolean;
+        is_support?: boolean;
+        is_staff?: boolean;
+      }>("/auth/session"),
     // Email/username + password (phone SMS-OTP stays primary).
     passwordLogin: (identifier: string, password: string) =>
       client.post<{ authenticated: boolean }>("/auth/password/login", {
@@ -689,5 +791,50 @@ export const cytapi = {
         code,
         state,
       }),
+  },
+
+  // The signed-in user's own support tickets (filed here, worked in the portal).
+  support: {
+    myTickets: () => client.get<{ data: SupportTicket[] }>("/me/support/tickets"),
+    create: (payload: { subject: string; body: string; category?: string; company_id?: number }) =>
+      client.post<TicketThread>("/me/support/tickets", payload),
+    ticket: (id: string | number) =>
+      client.get<TicketThread>(`/me/support/tickets/${id}`),
+    reply: (id: string | number, body: string) =>
+      client.post<TicketThread>(`/me/support/tickets/${id}/reply`, { body }),
+  },
+
+  // Admin portal — staff (admin OR support). Reads + support queue are staff-wide;
+  // role toggles are admin-only (the API 403s a support agent that calls them).
+  admin: {
+    whoami: () => client.get<StaffWhoami>("/admin/whoami"),
+    overview: () => client.get<AdminOverview>("/admin/overview"),
+    users: () => client.get<{ data: AdminUserRow[] }>("/admin/users"),
+    companies: () => client.get<{ data: AdminCompanyRow[] }>("/admin/companies"),
+    activity: (limit = 100) =>
+      client.get<{ data: ActivityEvent[] }>(`/admin/activity?limit=${limit}`),
+    setAdmin: (id: number, grant: boolean) =>
+      client.post<{ id: number; is_admin: boolean }>(`/admin/users/${id}/admin`, { grant }),
+    setSupport: (id: number, grant: boolean) =>
+      client.post<{ id: number; is_support: boolean }>(`/admin/users/${id}/support`, { grant }),
+
+    // Support queue.
+    queue: (params: { status?: string; assignee?: string; priority?: string; q?: string } = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v != null && v !== "") as [string, string][],
+      ).toString();
+      return client.get<{ data: SupportTicket[]; counts: QueueCounts }>(
+        `/admin/support/tickets${qs ? `?${qs}` : ""}`,
+      );
+    },
+    ticket: (id: string | number) =>
+      client.get<TicketThread>(`/admin/support/tickets/${id}`),
+    reply: (id: string | number, body: string) =>
+      client.post<TicketThread>(`/admin/support/tickets/${id}/reply`, { body }),
+    assign: (id: string | number, payload: { me?: boolean; assignee_id?: number | null; unassign?: boolean }) =>
+      client.post<{ ticket: SupportTicket }>(`/admin/support/tickets/${id}/assign`, payload),
+    setTicketStatus: (id: string | number, payload: { status?: TicketStatus; priority?: TicketPriority }) =>
+      client.post<{ ticket: SupportTicket }>(`/admin/support/tickets/${id}/status`, payload),
+    agents: () => client.get<{ data: SupportAgentRow[] }>("/admin/support/agents"),
   },
 };

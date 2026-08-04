@@ -13,13 +13,17 @@ import { cytapi } from "@/lib/api";
 export function SiteHeader() {
   // null = unknown (don't flash the wrong nav — e.g. "Sign in" on the dashboard).
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [staff, setStaff] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     cytapi
       .me()
-      .then(() => {
-        if (!cancelled) setAuthed(true);
+      .then((me) => {
+        if (!cancelled) {
+          setAuthed(true);
+          setStaff(Boolean(me?.is_staff));
+        }
       })
       .catch(() => {
         if (!cancelled) setAuthed(false);
@@ -52,9 +56,17 @@ export function SiteHeader() {
             <Link href="/settings" className={linkCls}>
               Advanced tools
             </Link>
+            <Link href="/support" className={linkCls}>
+              Support
+            </Link>
             <Link href="/dashboard" className={linkCls}>
               My profile
             </Link>
+            {staff && (
+              <Link href="/admin" className={`${linkCls} text-brand`}>
+                Admin
+              </Link>
+            )}
           </>
         ) : (
           <>
