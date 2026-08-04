@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Smartphone, ShieldCheck } from "lucide-react";
+import { ArrowRight, Smartphone, ShieldCheck, Mail } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { cytapi } from "@/lib/api";
 
@@ -29,6 +29,50 @@ export default function SignInPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Email/password path (secondary to phone SMS-OTP).
+  const [emailMode, setEmailMode] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [nickname, setNickname] = useState("");
+
+  async function passwordSignIn() {
+    if (busy) return;
+    if (!identifier.trim() || !password) {
+      setError("Enter your email or nickname and password.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await cytapi.auth.passwordLogin(identifier.trim(), password);
+      window.location.href = "/dashboard";
+    } catch {
+      setError("Wrong email/nickname or password.");
+      setBusy(false);
+    }
+  }
+
+  async function registerAccount() {
+    if (busy) return;
+    if (!identifier.trim() || password.length < 8) {
+      setError("Enter an email and a password of at least 8 characters.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await cytapi.auth.register({
+        email: identifier.trim(),
+        password,
+        nickname: nickname.trim() || undefined,
+      });
+      window.location.href = "/dashboard";
+    } catch {
+      setError("Couldn't create the account — that email may already be in use.");
+      setBusy(false);
+    }
+  }
 
   async function sendCode() {
     const value = normalizePhone(phone);
@@ -77,7 +121,101 @@ export default function SignInPage() {
 
       <section className="mx-auto mt-16 max-w-md">
         <div className="rounded-2xl border border-line bg-panel p-8 shadow-[0_20px_60px_-30px_#000]">
-          {step === "phone" ? (
+          {emailMode ? (
+            <>
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
+                <Mail size={20} className="text-brand" />
+              </div>
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
+                {registering ? "Create account" : "Log in with email"}
+              </h1>
+              <p className="mt-2 text-[14px] text-mut">
+                {registering
+                  ? "Register with an email and a password."
+                  : "Use your email or nickname and password."}
+              </p>
+
+              <label className="mt-6 block text-[12px] uppercase tracking-wider text-dim">
+                {registering ? "Email" : "Email or nickname"}
+              </label>
+              <input
+                type={registering ? "email" : "text"}
+                autoComplete={registering ? "email" : "username"}
+                className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
+                placeholder={registering ? "you@example.com" : "you@example.com or nickname"}
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value);
+                  setError(null);
+                }}
+              />
+
+              {registering && (
+                <>
+                  <label className="mt-4 block text-[12px] uppercase tracking-wider text-dim">
+                    Nickname (optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
+                    placeholder="a name to go by"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                  />
+                </>
+              )}
+
+              <label className="mt-4 block text-[12px] uppercase tracking-wider text-dim">
+                Password
+              </label>
+              <input
+                type="password"
+                autoComplete={registering ? "new-password" : "current-password"}
+                className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")
+                    registering ? registerAccount() : passwordSignIn();
+                }}
+              />
+              {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
+
+              <button
+                onClick={registering ? registerAccount : passwordSignIn}
+                disabled={busy}
+                className="cyt-gradient-bg mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-bold text-bg disabled:opacity-60"
+              >
+                {busy ? "Working…" : registering ? "Create account" : "Log in"}
+                {!busy && <ArrowRight size={16} strokeWidth={2.5} />}
+              </button>
+
+              <div className="mt-4 flex items-center justify-between text-[13px]">
+                <button
+                  onClick={() => {
+                    setEmailMode(false);
+                    setError(null);
+                  }}
+                  className="text-mut transition-colors hover:text-ink"
+                >
+                  ← Use phone instead
+                </button>
+                <button
+                  onClick={() => {
+                    setRegistering((r) => !r);
+                    setError(null);
+                  }}
+                  className="text-brand hover:underline"
+                >
+                  {registering ? "Have an account? Log in" : "Create an account"}
+                </button>
+              </div>
+            </>
+          ) : step === "phone" ? (
             <>
               <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
                 <Smartphone size={20} className="text-brand" />
@@ -125,6 +263,19 @@ export default function SignInPage() {
               <p className="mt-4 text-center text-[12.5px] text-dim">
                 New here? The same code creates your account. Message &amp; data
                 rates may apply.
+              </p>
+              <p className="mt-3 text-center text-[12.5px] text-dim">
+                or{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailMode(true);
+                    setError(null);
+                  }}
+                  className="text-brand hover:underline"
+                >
+                  log in with email
+                </button>
               </p>
             </>
           ) : (

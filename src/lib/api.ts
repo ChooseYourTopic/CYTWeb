@@ -615,6 +615,18 @@ export const cytapi = {
       client.get<{ authenticated: boolean; phone?: string; is_admin?: boolean }>(
         "/auth/session",
       ),
+    // Email/username + password (phone SMS-OTP stays primary).
+    passwordLogin: (identifier: string, password: string) =>
+      client.post<{ authenticated: boolean }>("/auth/password/login", {
+        identifier,
+        password,
+      }),
+    register: (payload: {
+      email: string;
+      password: string;
+      name?: string;
+      nickname?: string;
+    }) => client.post<{ authenticated: boolean; email: string }>("/auth/register", payload),
     logout: () => client.post<void>("/auth/logout"),
   },
 
