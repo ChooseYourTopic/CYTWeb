@@ -298,6 +298,8 @@ export type MeProfile = {
   display_name: string | null;
   phone: string | null;
   email: string | null;
+  // Whether the user has a login password set (phone-first users start without one).
+  has_password?: boolean;
   is_admin: boolean;
   topics_count: number;
   joined_at: string | null;
@@ -655,6 +657,11 @@ export const cytapi = {
     show_nickname?: boolean;
     email?: string | null;
   }) => client.put<MeProfile>("/me", patch),
+  updatePassword: (patch: {
+    current_password?: string;
+    password: string;
+    password_confirmation: string;
+  }) => client.put<{ has_password: boolean }>("/me/password", patch),
   updatePreferences: (patch: {
     timezone?: string | null;
     daily_budget_usd?: number | null;

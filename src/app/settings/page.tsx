@@ -125,6 +125,7 @@ export default function SettingsPage() {
 
         <div className="mt-6 grid gap-4">
           {me && <ProfileCard me={me} />}
+          {me && <PasswordCard me={me} />}
           {me && <PreferencesCard me={me} />}
           {cred && <AiAccountCard cred={cred} onChange={setCred} />}
         </div>
@@ -235,6 +236,122 @@ function ProfileCard({ me }: { me: MeProfile }) {
         >
           {busy ? <Loader2 size={15} className="animate-spin" /> : null}
           Save profile
+        </button>
+        {msg && (
+          <span className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
+            {msg.text}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------- Password --------------------------------- */
+
+function PasswordCard({ me }: { me: MeProfile }) {
+  const hasPassword = me.has_password ?? false;
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function save() {
+    if (busy) return;
+    if (next.length < 8) {
+      setMsg({ ok: false, text: "Password must be at least 8 characters." });
+      return;
+    }
+    if (next !== confirm) {
+      setMsg({ ok: false, text: "The passwords don't match." });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await cytapi.updatePassword({
+        ...(hasPassword ? { current_password: current } : {}),
+        password: next,
+        password_confirmation: confirm,
+      });
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setMsg({
+        ok: true,
+        text: hasPassword
+          ? "Password changed."
+          : "Password set — you can now log in with your email and password.",
+      });
+    } catch (e) {
+      setMsg({
+        ok: false,
+        text:
+          e instanceof ApiError && e.status === 422
+            ? "Check your current password and try again."
+            : "Couldn't save. Please try again.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card
+      icon={KeyRound}
+      title="Password"
+      desc={
+        hasPassword
+          ? "Change the password you use to log in with your email or nickname."
+          : "Set a password so you can log in with your email or nickname — your phone code still works too."
+      }
+    >
+      <div className="grid gap-3">
+        {hasPassword && (
+          <Field label="Current password">
+            <input
+              type="password"
+              autoComplete="current-password"
+              className="cyt-input"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              placeholder="••••••••"
+            />
+          </Field>
+        )}
+        <Field label={hasPassword ? "New password" : "Password"}>
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="cyt-input"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="At least 8 characters"
+          />
+        </Field>
+        <Field label="Confirm password">
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="cyt-input"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+            }}
+            placeholder="Re-enter your password"
+          />
+        </Field>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={busy || !next || !confirm || (hasPassword && !current)}
+          className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={15} className="animate-spin" /> : null}
+          {hasPassword ? "Change password" : "Set password"}
         </button>
         {msg && (
           <span className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
