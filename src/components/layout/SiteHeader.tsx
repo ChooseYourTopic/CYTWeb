@@ -46,7 +46,9 @@ export function SiteHeader() {
       <nav className="flex items-center gap-[18px] text-[13.5px] text-mut">
         {authed === null ? null : authed ? (
           <>
-            <span className="cursor-default">How it works</span>
+            <Link href="/start" className={linkCls}>
+              How it works
+            </Link>
             <Link href="/settings" className={linkCls}>
               Advanced tools
             </Link>
@@ -56,7 +58,9 @@ export function SiteHeader() {
           </>
         ) : (
           <>
-            <span className="cursor-default">How it works</span>
+            <Link href="/start" className={linkCls}>
+              How it works
+            </Link>
             <Link href="/signin" className={linkCls}>
               Sign in
             </Link>
