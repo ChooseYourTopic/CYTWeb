@@ -852,6 +852,16 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  async function changeLicense(u: AdminUserRow, tier: string) {
+    setBusyId(u.id);
+    try {
+      await cytapi.admin.setLicense(u.id, { tier });
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) return <PanelLoading label="Loading users…" />;
   if (error) return <PanelError text={error} />;
   if (rows.length === 0) return <PanelEmpty text="No users yet." />;
@@ -862,8 +872,10 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
         <thead>
           <tr className="border-b border-line text-[11px] uppercase tracking-wider text-dim">
             <Th>User</Th>
+            <Th>Account</Th>
             <Th>Contact</Th>
             <Th>Roles</Th>
+            <Th>License</Th>
             <Th className="text-right">Companies</Th>
             <Th>Joined</Th>
             {isAdmin && <Th className="text-right">Actions</Th>}
@@ -874,6 +886,9 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
             <tr key={u.id} className="border-b border-line/60 last:border-0">
               <Td>
                 <span className="font-semibold text-ink">{u.name ?? "—"}</span>
+              </Td>
+              <Td>
+                <span className="font-mono text-[12px] text-dim">{u.account_number ?? "—"}</span>
               </Td>
               <Td>
                 <span className="text-mut">{u.email ?? u.phone ?? "—"}</span>
@@ -890,6 +905,27 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
                     <Chip className="border-line bg-panel2 text-dim">User</Chip>
                   )}
                 </div>
+              </Td>
+              <Td>
+                {isAdmin ? (
+                  <select
+                    className="cyt-input h-8 min-w-[92px] py-1 text-[12px] disabled:opacity-50"
+                    value={u.license_tier ?? "free"}
+                    disabled={busyId === u.id}
+                    onChange={(e) => changeLicense(u, e.target.value)}
+                  >
+                    <option value="free">Free</option>
+                    <option value="starter">Starter</option>
+                    <option value="pro">Pro</option>
+                  </select>
+                ) : (
+                  <Chip className="border-line bg-panel2 uppercase text-mut">
+                    {u.license_tier ?? "free"}
+                  </Chip>
+                )}
+                {u.license_status && u.license_status !== "active" && (
+                  <span className="ml-1 text-[11px] text-warn">{u.license_status}</span>
+                )}
               </Td>
               <Td className="text-right text-mut">{num(u.companies)}</Td>
               <Td className="text-dim">{relTime(u.created_at)}</Td>

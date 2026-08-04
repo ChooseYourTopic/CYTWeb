@@ -289,8 +289,17 @@ export type UserPreferences = {
   social_handle: string | null;
 };
 
+export type License = {
+  tier: string; // free | starter | pro
+  status: string; // active | suspended | expired
+  since: string | null;
+};
+
 export type MeProfile = {
   id: number;
+  // Permanent branded account number, e.g. "CYT-000123".
+  account_number?: string | null;
+  license?: License;
   name: string | null;
   nickname: string | null;
   show_nickname: boolean;
@@ -584,11 +593,14 @@ export type AdminOverview = {
 
 export type AdminUserRow = {
   id: number;
+  account_number: string | null;
   name: string | null;
   email: string | null;
   phone: string | null;
   is_admin: boolean;
   is_support: boolean;
+  license_tier: string | null;
+  license_status: string | null;
   companies: number;
   created_at: string | null;
 };
@@ -817,6 +829,8 @@ export const cytapi = {
       client.post<{ id: number; is_admin: boolean }>(`/admin/users/${id}/admin`, { grant }),
     setSupport: (id: number, grant: boolean) =>
       client.post<{ id: number; is_support: boolean }>(`/admin/users/${id}/support`, { grant }),
+    setLicense: (id: number, payload: { tier?: string; status?: string }) =>
+      client.post<{ id: number; license: License }>(`/admin/users/${id}/license`, payload),
 
     // Support queue.
     queue: (params: { status?: string; assignee?: string; priority?: string; q?: string } = {}) => {
