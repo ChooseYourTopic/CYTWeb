@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { KpiTiles } from "@/components/research/KpiTiles";
 import { SectionTabs } from "@/components/research/SectionTabs";
@@ -21,12 +21,8 @@ import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
-import {
-  useIsProjectPaused,
-  toggleProjectPaused,
-} from "@/lib/pausedProjects";
 import Link from "next/link";
-import { ArrowLeft, Search, Pause, Play } from "lucide-react";
+import { ArrowLeft, Search, Pause, Play, Loader2 } from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
 function RunModeBadge({
@@ -67,28 +63,37 @@ function RunModeBadge({
 
 /** Pause / Resume the whole project from the topic header. */
 function ProjectPauseToggle({
-  topicId,
   paused,
+  busy,
+  onToggle,
 }: {
-  topicId: string;
   paused: boolean;
+  busy: boolean;
+  onToggle: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={() => toggleProjectPaused(topicId)}
+      disabled={busy}
+      onClick={onToggle}
       title={
         paused
-          ? "Resume this project — restart the live dashboard"
-          : "Pause this project — stop the live dashboard until you resume"
+          ? "Resume this project — restore the agents where they left off"
+          : "Pause this project — soft-shut the agents down and save their state"
       }
-      className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+      className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-semibold transition-colors disabled:opacity-60 ${
         paused
           ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
           : "border-line bg-panel2 text-mut hover:text-ink"
       }`}
     >
-      {paused ? <Play size={14} /> : <Pause size={14} />}
+      {busy ? (
+        <Loader2 size={14} className="animate-spin" />
+      ) : paused ? (
+        <Play size={14} />
+      ) : (
+        <Pause size={14} />
+      )}
       <span className="hidden sm:inline">{paused ? "Resume" : "Pause"}</span>
     </button>
   );
@@ -109,15 +114,44 @@ export function ResearchDashboard({
 }) {
   const active = useResearchStore((s) => s.activeSection);
 
-  // Paused projects halt all live polling and show a paused state until resumed.
-  const paused = useIsProjectPaused(topicId);
+  // Paused (soft-shutdown) state is server-owned. `pausedState` is null until the
+  // overview loads (or a toggle sets it optimistically); a paused project halts
+  // all live polling.
+  const [pausedState, setPausedState] = useState<boolean | null>(null);
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const paused = pausedState ?? false;
 
-  const { data: overview, loading } = useSectionData<TopicOverview>(
+  const { data: overview, loading, refetch } = useSectionData<TopicOverview>(
     "overview",
     () => cytapi.topicOverview(topicId),
     20000,
     !paused,
   );
+
+  // Seed the paused state from the server once the overview first loads.
+  useEffect(() => {
+    if (pausedState === null && overview?.paused !== undefined) {
+      setPausedState(overview.paused);
+    }
+  }, [overview?.paused, pausedState]);
+
+  async function togglePause() {
+    const next = !paused;
+    setPauseBusy(true);
+    setPausedState(next); // optimistic
+    try {
+      if (next) {
+        await cytapi.pauseTopic(topicId);
+      } else {
+        await cytapi.resumeTopic(topicId);
+      }
+      refetch();
+    } catch {
+      setPausedState(!next); // revert
+    } finally {
+      setPauseBusy(false);
+    }
+  }
 
   // Real per-company financials (incl. AI spend) for the spend KPI tile.
   const { summary: finance } = useFinanceSummary(topicId, 20000, !paused);
@@ -151,7 +185,11 @@ export function ResearchDashboard({
         </a>
 
         <div className="flex items-center gap-2">
-          <ProjectPauseToggle topicId={topicId} paused={paused} />
+          <ProjectPauseToggle
+            paused={paused}
+            busy={pauseBusy}
+            onToggle={togglePause}
+          />
           {/* Back to the home profile to browse or search for other topics */}
           <Link
             href="/dashboard"
@@ -205,10 +243,15 @@ export function ResearchDashboard({
             </div>
             <button
               type="button"
-              onClick={() => toggleProjectPaused(topicId)}
-              className="cyt-gradient-bg mt-1 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg"
+              onClick={togglePause}
+              disabled={pauseBusy}
+              className="cyt-gradient-bg mt-1 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg disabled:opacity-60"
             >
-              <Play size={16} strokeWidth={2.5} />
+              {pauseBusy ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Play size={16} strokeWidth={2.5} />
+              )}
               Resume project
             </button>
           </div>

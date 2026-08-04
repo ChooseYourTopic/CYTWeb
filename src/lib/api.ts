@@ -224,6 +224,9 @@ export type TopicOverview = {
   // How this topic's agents run: live on the owner's account vs preview/mock.
   run_mode?: "live" | "preview";
   run_source?: "user" | "platform" | "none";
+  // Soft-shutdown (pause) state for this topic.
+  paused?: boolean;
+  paused_at?: string | null;
   kpis?: {
     tasks_today?: number;
     findings?: number;
@@ -280,8 +283,18 @@ export type MyTopic = {
   tasks_failed: number;
   findings: number;
   reviewed: boolean;
+  // Soft-shutdown (pause) state — server-owned, so it holds across devices.
+  paused: boolean;
+  paused_at: string | null;
   last_activity_at: string | null;
   created_at: string | null;
+};
+
+/** Response from pausing/resuming a project (soft shutdown + checkpointed resume). */
+export type PauseResult = {
+  topic: MyTopic;
+  soft_shutdown?: { already_paused: boolean; agents: number; held_tasks: number };
+  resume?: { was_paused: boolean; restored_tasks: number };
 };
 
 export type MyTopicsResponse = {
@@ -564,6 +577,12 @@ export const cytapi = {
   // The signed-in user's own surfaces (session-backed; require credentials).
   me: () => client.get<MeProfile>("/me"),
   myTopics: () => client.get<MyTopicsResponse>("/me/topics"),
+  // Pause = soft shutdown (checkpoint every agent, hold in-flight work);
+  // resume restores the checkpointed queue. Server-owned state.
+  pauseTopic: (id: string | number) =>
+    client.post<PauseResult>(`/me/topics/${id}/pause`),
+  resumeTopic: (id: string | number) =>
+    client.post<PauseResult>(`/me/topics/${id}/resume`),
   updateProfile: (patch: { name?: string; email?: string | null }) =>
     client.put<MeProfile>("/me", patch),
   updatePreferences: (patch: {

@@ -24,7 +24,6 @@ import {
   type MyTopic,
   type TopicReviewStatus,
 } from "@/lib/api";
-import { useIsProjectPaused, toggleProjectPaused } from "@/lib/pausedProjects";
 
 /** Visual treatment per review status. */
 const STATUS: Record<
@@ -70,8 +69,16 @@ function PausedBadge() {
   );
 }
 
-function TopicCard({ t }: { t: MyTopic }) {
-  const paused = useIsProjectPaused(t.id);
+function TopicCard({
+  t,
+  onToggle,
+  busy,
+}: {
+  t: MyTopic;
+  onToggle: (t: MyTopic) => void;
+  busy: boolean;
+}) {
+  const paused = t.paused;
   const pct =
     t.tasks_total > 0
       ? Math.round((t.tasks_completed / t.tasks_total) * 100)
@@ -117,23 +124,30 @@ function TopicCard({ t }: { t: MyTopic }) {
         {/* Pause / Resume — toggles without following the card link. */}
         <button
           type="button"
+          disabled={busy}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            toggleProjectPaused(t.id);
+            onToggle(t);
           }}
           title={
             paused
-              ? "Resume this project"
-              : "Pause this project — stops the live dashboard until you resume"
+              ? "Resume this project — restore the agents where they left off"
+              : "Pause this project — soft-shuts the agents down and saves their state"
           }
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-60 ${
             paused
               ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
               : "border-line bg-panel2 text-mut hover:text-ink"
           }`}
         >
-          {paused ? <Play size={12} /> : <Pause size={12} />}
+          {busy ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : paused ? (
+            <Play size={12} />
+          ) : (
+            <Pause size={12} />
+          )}
           {paused ? "Resume" : "Pause"}
         </button>
 
@@ -153,6 +167,40 @@ export default function DashboardPage() {
   const [newTopic, setNewTopic] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  /** Pause/resume a project against the server, with an optimistic flip. */
+  const togglePause = useCallback(
+    async (t: MyTopic) => {
+      const next = !t.paused;
+      setBusyId(t.id);
+      setTopics((prev) =>
+        prev?.map((x) => (x.id === t.id ? { ...x, paused: next } : x)) ?? prev,
+      );
+      try {
+        const res = next
+          ? await cytapi.pauseTopic(t.id)
+          : await cytapi.resumeTopic(t.id);
+        setTopics((prev) =>
+          prev?.map((x) => (x.id === t.id ? res.topic : x)) ?? prev,
+        );
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          router.replace("/signin");
+          return;
+        }
+        // Revert the optimistic change on failure.
+        setTopics((prev) =>
+          prev?.map((x) => (x.id === t.id ? { ...x, paused: t.paused } : x)) ??
+          prev,
+        );
+        setError("Couldn't update that project. Please try again.");
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [router],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -281,7 +329,12 @@ export default function DashboardPage() {
           ) : topics && topics.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {topics.map((t) => (
-                <TopicCard key={t.id} t={t} />
+                <TopicCard
+                  key={t.id}
+                  t={t}
+                  onToggle={togglePause}
+                  busy={busyId === t.id}
+                />
               ))}
             </div>
           ) : (
