@@ -255,12 +255,18 @@ export type CreateTopicResponse = { topic_id: string | number };
 
 export type ViewMode = "standard" | "advanced";
 
+export type AiExperience = "new" | "advanced";
+export type BusinessExperience = "new" | "experienced";
+
 export type UserPreferences = {
   timezone: string | null;
   daily_budget_usd: number | null;
   platform_daily_budget_usd: number;
   // Dashboard density: standard = core five tabs, advanced = every tab.
   view_mode: ViewMode;
+  // Onboarding persona — the user's starting point ("first context").
+  ai_experience: AiExperience | null;
+  business_experience: BusinessExperience | null;
 };
 
 export type MeProfile = {
@@ -616,6 +622,8 @@ export const cytapi = {
     timezone?: string | null;
     daily_budget_usd?: number | null;
     view_mode?: ViewMode;
+    ai_experience?: AiExperience | null;
+    business_experience?: BusinessExperience | null;
   }) => client.put<UserPreferences>("/me/preferences", patch),
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the

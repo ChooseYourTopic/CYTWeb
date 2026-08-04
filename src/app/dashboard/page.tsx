@@ -209,6 +209,12 @@ export default function DashboardPage() {
         cytapi.me(),
         cytapi.myTopics(),
       ]);
+      // First-run: a brand-new user (no topics, no persona) starts in the
+      // two-step guided onboarding.
+      if (mine.topics.length === 0 && !profile.preferences?.ai_experience) {
+        router.replace("/start");
+        return;
+      }
       setMe(profile);
       setTopics(mine.topics);
     } catch (e) {
@@ -334,13 +340,19 @@ export default function DashboardPage() {
               {creating ? "Starting…" : "Start"}
             </button>
           </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[13px] text-mut">
-            <span>Not sure what to build?</span>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-mut">
             <Link
-              href="/choose"
+              href="/start"
               className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
             >
-              <Sparkles size={13} /> Help me choose a topic
+              <Sparkles size={13} /> New here? Get set up
+            </Link>
+            <span className="text-dim">·</span>
+            <Link
+              href="/choose"
+              className="font-semibold text-brand hover:underline"
+            >
+              Browse topic ideas
             </Link>
           </div>
         </div>
