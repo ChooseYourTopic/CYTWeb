@@ -369,12 +369,60 @@ function AgentDetailView({
           <div className="py-2 text-[12px] text-dim">Nothing queued.</div>
         ) : (
           d.queue.map((t) => (
-            <div key={t.id} className="border-b border-line py-2 last:border-0">
+            <div
+              key={t.id}
+              className="mb-2 rounded-lg border border-line bg-panel2 p-3 last:mb-0"
+            >
+              {/* Request */}
               <div className="flex items-start justify-between gap-3">
-                <span className="text-[13px] text-ink">{t.title}</span>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wide text-dim">
+                    Request
+                  </div>
+                  <div className="text-[13px] font-semibold text-ink">
+                    {t.title}
+                  </div>
+                </div>
                 <StatusPill s={t.status} />
               </div>
-              <div className="mt-1 flex items-center justify-between gap-2">
+
+              {/* Result */}
+              {t.result && (
+                <div className="mt-2">
+                  <div className="text-[10px] uppercase tracking-wide text-dim">
+                    Result
+                  </div>
+                  <div className="text-[12.5px] text-ink/90">{t.result}</div>
+                </div>
+              )}
+
+              {/* Prompt / context */}
+              {t.prompt && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] text-dim">
+                    Prompt / context
+                  </summary>
+                  <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-panel p-2 text-[11px] text-mut">
+                    {t.prompt}
+                  </pre>
+                </details>
+              )}
+
+              {/* Stats: model · duration · tokens · cost */}
+              {(t.model ||
+                t.duration_secs != null ||
+                t.tokens_used != null ||
+                t.cost_usd != null) && (
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-dim">
+                  {t.model && <span className="text-mut">{t.model}</span>}
+                  {t.duration_secs != null && <span>{t.duration_secs}s</span>}
+                  {t.tokens_used != null && <span>{t.tokens_used} tokens</span>}
+                  {t.cost_usd != null && <span>${t.cost_usd}</span>}
+                </div>
+              )}
+
+              {/* Meta + prioritize */}
+              <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-[11px] text-dim">
                   priority {t.priority}
                   {t.depends_on_count

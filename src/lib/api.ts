@@ -115,6 +115,15 @@ export type AgentQueueItem = {
   prioritized?: boolean;
   depends_on_count?: number;
   created_at: string | null;
+  // Ticket detail from the latest run for this task.
+  model?: string | null;
+  tokens_used?: number | null;
+  cost_usd?: number | null;
+  duration_secs?: number | null;
+  run_status?: string | null;
+  ran_at?: string | null;
+  prompt?: string | null;
+  result?: string | null;
 };
 
 /** The orchestrator's response to a prioritization request. */
