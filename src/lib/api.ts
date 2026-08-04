@@ -16,7 +16,33 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// A single in-flight refresh shared by all callers, so a burst of 401s triggers
+// exactly one /auth/refresh round-trip (the long refresh cookie mints a new short
+// access cookie) rather than a storm.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function silentRefresh(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  retryOn401 = true,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/v1${path}`, {
     ...options,
     headers: {
@@ -24,13 +50,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       "X-API-Key": API_KEY,
       ...options.headers,
     },
-    // Send/receive the session cookie set by the SMS auth flow so the signed-in
+    // Send/receive the auth cookies (session + access/refresh) so the signed-in
     // user's own surfaces (/me/*) and topic ownership work. Same-origin in prod.
     credentials: "include",
     // Live dashboard data must never be statically cached.
     cache: "no-store",
   });
   if (!res.ok) {
+    // On a 401, try the long refresh token once to mint a fresh access token,
+    // then replay the original request. Never loop on the auth endpoints.
+    if (res.status === 401 && retryOn401 && !path.startsWith("/auth/")) {
+      if (await silentRefresh()) {
+        return request<T>(path, options, false);
+      }
+    }
     const detail = await res.text().catch(() => res.statusText);
     throw new ApiError(res.status, `API ${res.status}: ${detail}`);
   }
@@ -752,6 +785,9 @@ export const cytapi = {
       name?: string;
       nickname?: string;
     }) => client.post<{ authenticated: boolean; email: string }>("/auth/register", payload),
+    // Trade the long refresh cookie for a fresh access cookie (usually automatic
+    // via the 401 interceptor; exposed for explicit use too).
+    refresh: () => client.post<{ authenticated: boolean }>("/auth/refresh"),
     logout: () => client.post<void>("/auth/logout"),
   },
 
