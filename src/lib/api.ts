@@ -612,6 +612,11 @@ export const cytapi = {
     client.get<{ context: TopicContext }>(`/me/topics/${id}/context`),
   saveTopicContext: (id: string | number, patch: TopicContext) =>
     client.put<{ context: TopicContext }>(`/me/topics/${id}/context`, patch),
+  // Set the project's daily spend cap (from the Overview effort presets).
+  setTopicSpendCap: (id: string | number, amount: number | null) =>
+    client.put<{ spend_cap_usd: number | null }>(`/me/topics/${id}/spend-cap`, {
+      amount,
+    }),
   updateProfile: (patch: {
     name?: string | null;
     nickname?: string | null;

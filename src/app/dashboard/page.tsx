@@ -26,6 +26,15 @@ import {
   type TopicReviewStatus,
 } from "@/lib/api";
 
+/** Playful quick-start ideas — click to drop one into the box. */
+const FUN_SUGGESTIONS = [
+  "a dating app for houseplants",
+  "a gym that's only open at 3am",
+  "socks engineered to never lose their pair",
+  "a bakery that only sells corner pieces",
+  "an AI that roasts your grocery list",
+];
+
 /** Visual treatment per review status. */
 const STATUS: Record<
   TopicReviewStatus,
@@ -354,6 +363,17 @@ export default function DashboardPage() {
             >
               Browse topic ideas
             </Link>
+            {/* Playful quick-start bubbles — click to drop one into the box. */}
+            {FUN_SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setNewTopic(s)}
+                className="rounded-full border border-line px-2.5 py-1 text-[12px] text-mut transition-colors hover:border-[#31384c] hover:text-ink"
+              >
+                {s}
+              </button>
+            ))}
           </div>
         </div>
 

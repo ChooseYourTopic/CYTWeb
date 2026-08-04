@@ -16,15 +16,15 @@ import { Sparkline } from "@/components/research/Sparkline";
 import { cytapi, ApiError, type TopicOverview } from "@/lib/api";
 
 /**
- * Effort presets. Each activates a task on the project; the bigger the push, the
- * more the agent team does — and the higher the estimated development cost.
+ * Effort presets. Each sets the project's daily spend cap and kicks off work —
+ * the bigger the push, the higher the budget you let the agent team work within.
  */
 type Tier = {
   key: string;
   label: string;
   Icon: typeof Zap;
   blurb: string;
-  estUsd: number;
+  capUsd: number;
 };
 
 const TIERS: Tier[] = [
@@ -32,29 +32,29 @@ const TIERS: Tier[] = [
     key: "quick",
     label: "Something quick",
     Icon: Zap,
-    blurb: "A fast, focused pass — one quick agent run to nudge the project forward.",
-    estUsd: 0.25,
+    blurb: "A fast, focused pass — a tight budget to nudge the project forward.",
+    capUsd: 5,
   },
   {
     key: "couple",
     label: "Got a couple minutes",
     Icon: Clock,
     blurb: "A short burst across a couple of agents.",
-    estUsd: 1.0,
+    capUsd: 20,
   },
   {
     key: "more",
     label: "Got a little more",
     Icon: Coffee,
     blurb: "A deeper dive across the core team.",
-    estUsd: 3.0,
+    capUsd: 50,
   },
   {
     key: "mission",
     label: "I'm on a mission",
     Icon: Rocket,
-    blurb: "A full push — the whole crew works the project end to end.",
-    estUsd: 10.0,
+    blurb: "A full push — the whole crew works the project within a larger budget.",
+    capUsd: 150,
   },
 ];
 
@@ -153,14 +153,14 @@ function ActivateTaskModal({
             </p>
 
             <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-panel2 px-4 py-3">
-              <span className="text-[13px] text-mut">Estimated cost</span>
+              <span className="text-[13px] text-mut">Daily spend cap</span>
               <span className="text-[15px] font-bold text-ink">
-                ~${tier.estUsd.toFixed(2)}
+                ${tier.capUsd}/day
               </span>
             </div>
             <p className="mt-2 text-[11.5px] text-dim">
-              An estimate — actual spend depends on the work and is capped by your
-              daily budget.
+              Your agents work within this cap — they never spend more than this
+              per day on the project.
             </p>
 
             {error && <p className="mt-3 text-[13px] text-bad">{error}</p>}
@@ -247,7 +247,11 @@ export function LivingReport({
     setSubmitting(true);
     setError(null);
     try {
-      // Activate work on the project — the orchestrator plans + delegates.
+      // Set the project's daily spend cap, then activate work (orchestrator
+      // plans + delegates within that cap).
+      if (pendingTier) {
+        await cytapi.setTopicSpendCap(topicId, pendingTier.capUsd);
+      }
       await cytapi.agentTrigger("orchestrator", topicId);
       setDone(true);
     } catch (e) {
