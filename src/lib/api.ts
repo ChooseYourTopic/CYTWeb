@@ -174,6 +174,7 @@ export type FinanceSummary = {
 export type SectionKey =
   | "overview"
   | "context"
+  | "integrations"
   | "competitors"
   | "market"
   | "drafts"
