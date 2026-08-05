@@ -916,8 +916,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
                       onChange={(e) => changeLicense(u, e.target.value)}
                     >
                       <option value="standard">Standard user</option>
-                      <option value="business_owner">Business owner</option>
-                      <option value="advertiser">Advertiser</option>
+                      <option value="expert">Expert user</option>
                       <option value="support">Support agent</option>
                       <option value="admin">Admin</option>
                     </select>

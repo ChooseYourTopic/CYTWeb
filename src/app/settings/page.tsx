@@ -423,6 +423,9 @@ function PreferencesCard({ me }: { me: MeProfile }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // The license dictates the view: Expert is unlocked only by an expert/staff license.
+  const canExpert = me.security?.entitlements?.features?.expert_view ?? true;
+
   const tzOptions = tz && !TIMEZONES.includes(tz) ? [tz, ...TIMEZONES] : TIMEZONES;
 
   async function save() {
@@ -481,24 +484,37 @@ function PreferencesCard({ me }: { me: MeProfile }) {
             {(
               [
                 { key: "standard", label: "Standard", hint: "Core five tabs" },
-                { key: "advanced", label: "Expert", hint: "Every tab" },
+                {
+                  key: "advanced",
+                  label: "Expert",
+                  hint: canExpert ? "Every tab" : "Expert license",
+                },
               ] as { key: ViewMode; label: string; hint: string }[]
-            ).map((o) => (
-              <button
-                key={o.key}
-                type="button"
-                onClick={() => setViewMode(o.key)}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
-                  viewMode === o.key
-                    ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
-                    : "text-mut hover:text-ink"
-                }`}
-              >
-                {o.label}
-                <span className="text-[11px] font-normal text-dim">{o.hint}</span>
-              </button>
-            ))}
+            ).map((o) => {
+              const locked = o.key === "advanced" && !canExpert;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => !locked && setViewMode(o.key)}
+                  className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                    viewMode === o.key
+                      ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+                      : "text-mut hover:text-ink"
+                  } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  {o.label}
+                  <span className="text-[11px] font-normal text-dim">{o.hint}</span>
+                </button>
+              );
+            })}
           </div>
+          {!canExpert && (
+            <p className="mt-1.5 text-[12px] text-dim">
+              The Expert view (every tab) is unlocked with an Expert license.
+            </p>
+          )}
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">

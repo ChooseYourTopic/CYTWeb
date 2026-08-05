@@ -322,12 +322,29 @@ export type UserPreferences = {
   social_handle: string | null;
 };
 
-export type LicenseType =
-  | "standard"
-  | "business_owner"
-  | "advertiser"
-  | "support"
-  | "admin";
+export type LicenseType = "standard" | "expert" | "support" | "admin";
+
+/** What the license entitles the user to — drives view + feature gating. */
+export type Entitlements = {
+  view: "standard" | "expert";
+  features: {
+    expert_view: boolean;
+    expert_tabs: boolean;
+    admin_portal: boolean;
+    support_queue: boolean;
+    manage_roles: boolean;
+  };
+  can_upgrade_to_expert: boolean;
+};
+
+export type SecuritySection = {
+  is_admin: boolean;
+  is_support: boolean;
+  is_staff: boolean;
+  has_password?: boolean;
+  license: License;
+  entitlements: Entitlements;
+};
 
 export type License = {
   // The license id (branded, e.g. "CYT-LIC-000123").
@@ -360,6 +377,8 @@ export type MeProfile = {
   // Support-team member (admin-portal support queue); staff = admin OR support.
   is_support?: boolean;
   is_staff?: boolean;
+  // Structured login sections; `security.entitlements` drives view/feature gating.
+  security?: SecuritySection;
   topics_count: number;
   joined_at: string | null;
   preferences?: UserPreferences;
