@@ -2,6 +2,8 @@
 // an X-API-Key header. Every helper is fail-soft friendly: callers wrap in
 // try/catch and fall back to skeletons when the backend is not up.
 
+import { getRef } from "./ref";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
@@ -355,6 +357,12 @@ export type License = {
   since: string | null;
 };
 
+export type Affiliate = {
+  id: string | null;
+  link: string;
+  referral_count: number;
+};
+
 export type MeProfile = {
   id: number;
   // Master profile id shown at the top of the profile, e.g. "CYT-PRO-000123".
@@ -363,6 +371,8 @@ export type MeProfile = {
   account_number?: string | null;
   // Referral / affiliate code, e.g. "CYT-AF-000123".
   affiliate_id?: string | null;
+  // Affiliate link + running count of people this user has introduced.
+  affiliate?: Affiliate;
   license?: License;
   name: string | null;
   nickname: string | null;
@@ -787,6 +797,7 @@ export const cytapi = {
       client.post<{ authenticated: boolean }>("/auth/sms/verify", {
         phone,
         code,
+        ref: getRef(),
       }),
     session: () =>
       client.get<{
@@ -807,7 +818,11 @@ export const cytapi = {
       password: string;
       name?: string;
       nickname?: string;
-    }) => client.post<{ authenticated: boolean; email: string }>("/auth/register", payload),
+    }) =>
+      client.post<{ authenticated: boolean; email: string }>("/auth/register", {
+        ...payload,
+        ref: getRef(),
+      }),
     // Trade the long refresh cookie for a fresh access cookie (usually automatic
     // via the 401 interceptor; exposed for explicit use too).
     refresh: () => client.post<{ authenticated: boolean }>("/auth/refresh"),

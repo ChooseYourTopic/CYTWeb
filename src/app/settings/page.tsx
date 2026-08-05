@@ -13,7 +13,12 @@ import {
   KeyRound,
   Link2,
   Sparkles,
+  Share2,
+  Copy,
+  Check,
+  Users,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
   cytapi,
@@ -143,6 +148,7 @@ export default function SettingsPage() {
 
         <div className="mt-6 grid gap-4">
           {me && <ProfileCard me={me} />}
+          {me && <AffiliateCard me={me} />}
           {me && <PasswordCard me={me} />}
           {me && <PreferencesCard me={me} />}
           {cred && <AiAccountCard cred={cred} onChange={setCred} />}
@@ -265,13 +271,6 @@ function ProfileCard({ me }: { me: MeProfile }) {
             />
           </Field>
         </div>
-        <Field label="Affiliate ID — your referral code">
-          <input
-            className="cyt-input font-mono opacity-60"
-            value={me.affiliate_id ?? "—"}
-            readOnly
-          />
-        </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button
@@ -286,6 +285,78 @@ function ProfileCard({ me }: { me: MeProfile }) {
           <span className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
             {msg.text}
           </span>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ------------------------------- Affiliate -------------------------------- */
+
+function AffiliateCard({ me }: { me: MeProfile }) {
+  const link =
+    me.affiliate?.link ??
+    (me.affiliate_id
+      ? `https://chooseyourtopic.com/?ref=${me.affiliate_id}`
+      : "");
+  const count = me.affiliate?.referral_count ?? 0;
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <Card
+      icon={Share2}
+      title="Refer & grow"
+      desc="Share your link or QR code. Anyone who joins through it is credited to you."
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3 py-2">
+            <Users size={16} className="text-brand" />
+            <span className="text-[20px] font-bold text-ink">{count}</span>
+            <span className="text-[12px] text-mut">
+              {count === 1 ? "person introduced" : "people introduced"}
+            </span>
+          </div>
+
+          <Field label="Your affiliate link">
+            <div className="flex gap-2">
+              <input className="cyt-input font-mono text-[12px]" value={link} readOnly />
+              <button
+                onClick={copy}
+                className="flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+              >
+                {copied ? (
+                  <Check size={14} className="text-good" />
+                ) : (
+                  <Copy size={14} />
+                )}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </Field>
+          <p className="mt-2 text-[12px] text-dim">
+            Affiliate ID{" "}
+            <span className="font-mono text-mut">{me.affiliate_id ?? "—"}</span>
+          </p>
+        </div>
+
+        {link && (
+          <div className="flex flex-col items-center gap-2">
+            <div className="rounded-xl border border-line bg-white p-3">
+              <QRCodeSVG value={link} size={120} level="M" />
+            </div>
+            <span className="text-[11px] text-dim">Scan to join</span>
+          </div>
         )}
       </div>
     </Card>
