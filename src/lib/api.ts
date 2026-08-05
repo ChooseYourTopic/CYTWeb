@@ -413,6 +413,9 @@ export type MyTopic = {
   paused_at: string | null;
   last_activity_at: string | null;
   created_at: string | null;
+  // Tamper-evident handle (owner + license bound). Sent back as X-Topic-Signature
+  // so the topic page validates itself, not just its numeric id.
+  access_sig?: string;
 };
 
 /** Response from pausing/resuming a project (soft shutdown + checkpointed resume). */
