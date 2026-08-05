@@ -337,9 +337,12 @@ export default function StartPage() {
             {/* Categories + suggestions to help them get started. */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-[13px] font-semibold text-mut">
+                <Link
+                  href="/choose"
+                  className="text-[13px] font-semibold text-mut transition-colors hover:text-ink hover:underline"
+                >
                   Recommended topics
-                </div>
+                </Link>
                 <Link
                   href="/choose"
                   className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-brand hover:underline"
