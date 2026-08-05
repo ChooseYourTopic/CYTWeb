@@ -327,28 +327,32 @@ export function ResearchDashboard({
         </div>
       </div>
 
-      {paused ? (
-        /* Paused: no KPI row, no panels, no rail — so every live hook unmounts
-           and polling fully stops until the user resumes. */
+      {/* Paused: the agents are soft shut down and the panels stop polling
+          (one-shot, saved state), but everything stays navigable — a slim
+          banner replaces the old blocking card so settings + every tab, incl.
+          the overview, remain viewable while paused. */}
+      {paused && (
         <Card>
-          <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-full border border-[#4a3b1a] bg-[#1c1708] text-warn">
-              <Pause size={24} />
-            </span>
-            <div>
-              <h3 className="text-[18px] font-bold text-ink">Project paused</h3>
-              <p className="mx-auto mt-1 max-w-[420px] text-[14px] text-mut">
-                The live dashboard for{" "}
-                <span className="text-ink">{topicName}</span> has stopped
-                refreshing. Your findings so far are saved — resume any time to
-                pick the investigation back up.
-              </p>
+          <div className="flex flex-col items-center justify-between gap-3 px-5 py-4 text-center sm:flex-row sm:text-left">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#4a3b1a] bg-[#1c1708] text-warn">
+                <Pause size={18} />
+              </span>
+              <div>
+                <h3 className="text-[15px] font-bold text-ink">Project paused</h3>
+                <p className="text-[13px] text-mut">
+                  You&apos;re viewing{" "}
+                  <span className="text-ink">{topicName}</span>&apos;s saved
+                  state. The agents are stopped and won&apos;t take on new work
+                  until you resume — settings and every tab stay open to browse.
+                </p>
+              </div>
             </div>
             <button
               type="button"
               onClick={togglePause}
               disabled={pauseBusy}
-              className="cyt-gradient-bg mt-1 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold text-bg disabled:opacity-60"
+              className="cyt-gradient-bg inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold text-bg disabled:opacity-60"
             >
               {pauseBusy ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -359,54 +363,50 @@ export function ResearchDashboard({
             </button>
           </div>
         </Card>
-      ) : (
-        <>
-          <KpiTiles
-            overview={overview}
-            finance={finance}
-            findings={Number(findings)}
-            activeAgents={activeAgents}
-            loading={loading}
-          />
-
-          {/* Canvas + investigation rail */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-            <Card>
-              <SectionTabs />
-              <div>
-                {active === "overview" && (
-                  <LivingReport
-                    overview={overview}
-                    loading={loading}
-                    topicId={topicId}
-                  />
-                )}
-                {active === "context" && <ContextPanel topicId={topicId} />}
-                {active === "integrations" && <IntegrationsPanel />}
-                {active === "models" && <ModelsPanel />}
-                {active === "status" && <StatusPanel topicId={topicId} />}
-                {active === "automations" && <AutomationsPanel />}
-                {active === "network" && <NetworkPanel />}
-                {active === "security" && <SecurityPanel />}
-                {active === "competitors" && (
-                  <CompetitorPanel topicId={topicId} />
-                )}
-                {active === "market" && <MarketSignalsPanel topicId={topicId} />}
-                {active === "drafts" && <DraftsPanel topicId={topicId} />}
-                {active === "outreach" && <OutreachPanel topicId={topicId} />}
-                {active === "support" && <SupportPanel topicId={topicId} />}
-                {active === "ads" && <AdsPanel topicId={topicId} />}
-                {active === "build" && <BuildPanel topicId={topicId} />}
-                {active === "finance" && <FinancePanel topicId={topicId} />}
-                {active === "decisions" && <DecisionsPanel />}
-                {active === "report" && <ReportArtifact />}
-              </div>
-            </Card>
-
-            <InvestigationRail companyId={topicId} />
-          </div>
-        </>
       )}
+
+      <KpiTiles
+        overview={overview}
+        finance={finance}
+        findings={Number(findings)}
+        activeAgents={activeAgents}
+        loading={loading}
+      />
+
+      {/* Canvas + investigation rail */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+        <Card>
+          <SectionTabs />
+          <div>
+            {active === "overview" && (
+              <LivingReport
+                overview={overview}
+                loading={loading}
+                topicId={topicId}
+              />
+            )}
+            {active === "context" && <ContextPanel topicId={topicId} />}
+            {active === "integrations" && <IntegrationsPanel />}
+            {active === "models" && <ModelsPanel />}
+            {active === "status" && <StatusPanel topicId={topicId} />}
+            {active === "automations" && <AutomationsPanel />}
+            {active === "network" && <NetworkPanel />}
+            {active === "security" && <SecurityPanel />}
+            {active === "competitors" && <CompetitorPanel topicId={topicId} />}
+            {active === "market" && <MarketSignalsPanel topicId={topicId} />}
+            {active === "drafts" && <DraftsPanel topicId={topicId} />}
+            {active === "outreach" && <OutreachPanel topicId={topicId} />}
+            {active === "support" && <SupportPanel topicId={topicId} />}
+            {active === "ads" && <AdsPanel topicId={topicId} />}
+            {active === "build" && <BuildPanel topicId={topicId} />}
+            {active === "finance" && <FinancePanel topicId={topicId} />}
+            {active === "decisions" && <DecisionsPanel />}
+            {active === "report" && <ReportArtifact />}
+          </div>
+        </Card>
+
+        <InvestigationRail companyId={topicId} />
+      </div>
     </main>
   );
 }
