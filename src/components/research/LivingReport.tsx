@@ -60,7 +60,14 @@ const TIERS: Tier[] = [
 ];
 
 // Report sections, top to bottom.
-const SECTION_ORDER = ["decided", "value_prop", "plan", "goals"];
+const SECTION_ORDER = [
+  "decided",
+  "next_steps",
+  "achievements",
+  "value_prop",
+  "plan",
+  "goals",
+];
 
 /** A report section that collapses to just its header. */
 function CollapsibleSection({
@@ -213,6 +220,8 @@ export function LivingReport({
   );
   const execSummary = overview?.exec_summary;
   const projectName = overview?.topic || "your project";
+  const nextSteps = overview?.recommended_next_steps ?? [];
+  const achievements = overview?.recent_achievements ?? [];
 
   // Sections are individually collapsible; all open by default.
   const [openSet, setOpenSet] = useState<Set<string>>(new Set(SECTION_ORDER));
@@ -381,6 +390,45 @@ export function LivingReport({
         ) : (
           <p className="text-[13px] text-dim">
             Writing your report… agents are researching.
+          </p>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Recommended next steps"
+        open={isOpen("next_steps")}
+        onToggle={() => toggle("next_steps")}
+      >
+        {nextSteps.length > 0 ? (
+          <ul className="list-disc space-y-1 pl-5 text-[14px] text-ink/90">
+            {nextSteps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-dim">
+            No recommended steps yet — the team is still planning.
+          </p>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Recent achievements"
+        open={isOpen("achievements")}
+        onToggle={() => toggle("achievements")}
+      >
+        {achievements.length > 0 ? (
+          <ul className="space-y-1.5 text-[14px] text-ink/90">
+            {achievements.map((s, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-good" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-dim">
+            No completed work yet — achievements appear here as tasks finish.
           </p>
         )}
       </CollapsibleSection>

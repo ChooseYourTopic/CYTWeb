@@ -291,6 +291,9 @@ export type TopicOverview = {
   // Soft-shutdown (pause) state for this topic.
   paused?: boolean;
   paused_at?: string | null;
+  // The team's recommended next steps + recent achievements for this topic.
+  recommended_next_steps?: string[];
+  recent_achievements?: string[];
   kpis?: {
     tasks_today?: number;
     findings?: number;
@@ -794,8 +797,14 @@ export const cytapi = {
       topic: raw?.company?.topic ?? "",
       tagline: raw?.company?.value_prop,
       exec_summary: plan.summary ?? raw?.company?.mission,
+      cycle_day: raw?.cycle_day,
+      cycle_phase: raw?.cycle_phase,
       run_mode: raw?.run_mode,
       run_source: raw?.run_source,
+      paused: raw?.paused,
+      paused_at: raw?.paused_at,
+      recommended_next_steps: raw?.recommended_next_steps ?? [],
+      recent_achievements: raw?.recent_achievements ?? [],
       kpis: raw?.kpis ?? {},
       spark: raw?.spark ?? [],
       items,
