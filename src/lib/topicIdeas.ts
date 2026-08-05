@@ -115,3 +115,65 @@ export const TOPIC_CATALOG: IdeaCategory[] = [
 /** A rotating set of playful pre-selects surfaced at the bottom of /start. */
 export const WILDCARD_TOPICS: string[] =
   TOPIC_CATALOG.find((c) => c.category === "Just for Fun")?.ideas ?? [];
+
+/**
+ * Recommended topics per focus button on /start step 2. Each of the five
+ * independent focuses surfaces a different, curated set of topic ideas.
+ */
+export const FOCUS_IDEAS: Record<string, { blurb: string; ideas: string[] }> = {
+  invent: {
+    blurb: "Brand-new, inventive ideas",
+    ideas: [
+      "a gadget that keeps earbuds from tangling",
+      "reusable packaging that dissolves after use",
+      "an app that turns doodles into logos",
+      "a smart water bottle that coaches hydration",
+      "modular furniture that grows with your kids",
+      "a device that finds lost TV remotes",
+    ],
+  },
+  organize: {
+    blurb: "Structure, tidy and streamline",
+    ideas: [
+      "a home-organization and decluttering service",
+      "an app that plans your week around your energy",
+      "a subscription for labeled meal-prep containers",
+      "a digital filing system for small businesses",
+      "a moving concierge that packs and unpacks",
+      "a closet and capsule-wardrobe service",
+    ],
+  },
+  plan: {
+    blurb: "Map it out and plan ahead",
+    ideas: [
+      "an event-planning marketplace for micro-weddings",
+      "a trip-planner for spontaneous weekends",
+      "a coaching service for first-time founders",
+      "a meal-planning app for busy families",
+      "a retirement-planning tool for freelancers",
+      "a project-plan template shop for creators",
+    ],
+  },
+  implement: {
+    blurb: "Build, make and ship it",
+    ideas: [
+      "a print-on-demand studio for indie designers",
+      "a rapid-prototyping shop for hardware startups",
+      "a no-code app-building service for local shops",
+      "a custom-furniture maker with 3D previews",
+      "a landing-page builder for weekend projects",
+      "a small-batch manufacturing broker",
+    ],
+  },
+  fund: {
+    blurb: "Raise money and manage budgets",
+    ideas: [
+      "a crowdfunding coach for first-time creators",
+      "a micro-investing app for spare change",
+      "a grant-finder tool for small nonprofits",
+      "an invoice-financing service for freelancers",
+      "a budgeting app for irregular incomes",
+      "a marketplace matching startups with angels",
+    ],
+  },
+};

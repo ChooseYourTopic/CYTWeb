@@ -10,9 +10,10 @@ import {
   Plus,
   Sparkles,
   Lightbulb,
-  Blocks,
+  Boxes,
   ClipboardList,
   Rocket,
+  CircleDollarSign,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -22,7 +23,7 @@ import {
   type BusinessExperience,
   type SocialPlatform,
 } from "@/lib/api";
-import { TOPIC_CATALOG, WILDCARD_TOPICS } from "@/lib/topicIdeas";
+import { FOCUS_IDEAS, WILDCARD_TOPICS } from "@/lib/topicIdeas";
 
 type Clarity = "know" | "idea";
 type YesNo = "yes" | "no";
@@ -78,9 +79,10 @@ export default function StartPage() {
   );
   const [socialHandle, setSocialHandle] = useState("");
   const [topic, setTopic] = useState("");
-  const [ideaCat, setIdeaCat] = useState<string>(TOPIC_CATALOG[0].category);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Independent focus selector on step 2 — a user can pick any of these anytime.
+  const [stage, setStage] = useState<string>("invent");
 
   const step1Ready = Boolean(ai && biz && clarity && hasWebsite && usesSocial);
 
@@ -268,44 +270,43 @@ export default function StartPage() {
               <ArrowLeft size={14} /> Back
             </button>
 
-            {/* The four-stage journey — you're at "Invent" (choosing the idea);
-                Assemble, Plan and Implement are what your agent crew does next. */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {/* Five independent focuses — pick any, any time. */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {(
                 [
-                  { key: "invent", label: "Invent", hint: "Pick your idea", icon: Lightbulb },
-                  { key: "assemble", label: "Assemble", hint: "Build the company", icon: Blocks },
+                  { key: "invent", label: "Invent", hint: "Shape the idea", icon: Lightbulb },
+                  { key: "organize", label: "Organize", hint: "Structure it", icon: Boxes },
                   { key: "plan", label: "Plan", hint: "Map the work", icon: ClipboardList },
-                  { key: "implement", label: "Implement", hint: "Ship it", icon: Rocket },
+                  { key: "implement", label: "Implement", hint: "Build & ship", icon: Rocket },
+                  { key: "fund", label: "Fund Business", hint: "Raise & budget", icon: CircleDollarSign },
                 ] as const
-              ).map((s, i) => {
-                const active = s.key === "invent";
+              ).map((s) => {
+                const active = stage === s.key;
                 const Icon = s.icon;
                 return (
                   <button
                     key={s.key}
                     type="button"
-                    disabled={!active}
-                    aria-current={active ? "step" : undefined}
+                    aria-pressed={active}
+                    onClick={() => setStage(s.key)}
                     className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                       active
                         ? "cyt-gradient-bg border-transparent text-bg"
-                        : "border-line bg-panel2 text-mut"
+                        : "border-line bg-panel2 text-mut hover:text-ink"
                     }`}
                   >
-                    <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
+                    <span className="flex items-center gap-1.5 text-[13px] font-bold">
                       <Icon size={15} /> {s.label}
                     </span>
                     <span className={`text-[11px] ${active ? "text-bg/80" : "text-dim"}`}>
-                      {i + 1}. {s.hint}
+                      {s.hint}
                     </span>
                   </button>
                 );
               })}
             </div>
             <p className="text-[14px] text-mut">
-              You&apos;re at <span className="text-ink">Invent</span> — type your
-              topic, or pick one of the ideas below.
+              Type your topic, or pick one of the ideas below.
             </p>
 
             <div className="flex gap-2">
@@ -337,7 +338,7 @@ export default function StartPage() {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[13px] font-semibold text-mut">
-                  Or pick from ideas
+                  Recommended topics
                 </div>
                 <Link
                   href="/choose"
@@ -346,26 +347,11 @@ export default function StartPage() {
                   <Sparkles size={12} /> See all
                 </Link>
               </div>
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {TOPIC_CATALOG.map((c) => (
-                  <button
-                    key={c.category}
-                    type="button"
-                    onClick={() => setIdeaCat(c.category)}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-                      ideaCat === c.category
-                        ? "border-[#31384c] bg-panel2 text-ink"
-                        : "border-line text-mut hover:text-ink"
-                    }`}
-                  >
-                    {c.category}
-                  </button>
-                ))}
-              </div>
+              <p className="mb-3 text-[12px] text-dim">
+                {FOCUS_IDEAS[stage]?.blurb}
+              </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {(
-                  TOPIC_CATALOG.find((c) => c.category === ideaCat)?.ideas ?? []
-                ).map((idea) => (
+                {(FOCUS_IDEAS[stage]?.ideas ?? []).map((idea) => (
                   <button
                     key={idea}
                     type="button"
