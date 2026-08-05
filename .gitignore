@@ -32,3 +32,6 @@ yarn-error.log*
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# local build/dev logs
+*.log
