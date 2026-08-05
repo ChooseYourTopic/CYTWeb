@@ -878,6 +878,10 @@ export const cytapi = {
       client.put<AiCredential>("/me/ai-credential/api-key", {
         api_key: apiKey,
       }),
+    validate: () =>
+      client.post<AiCredential & { ok: boolean; message: string }>(
+        "/me/ai-credential/validate",
+      ),
     disconnect: () => client.del<{ connected: boolean }>("/me/ai-credential"),
     oauthStart: () =>
       client.post<{ authorize_url: string }>("/me/ai-credential/oauth/start"),

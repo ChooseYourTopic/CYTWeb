@@ -688,6 +688,47 @@ function AiAccountCard({
     }
   }
 
+  async function test() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await cytapi.aiCredential.validate();
+      onChange(await cytapi.aiCredential.get());
+      setMsg({ ok: true, text: r.message });
+    } catch (e) {
+      await cytapi.aiCredential
+        .get()
+        .then(onChange)
+        .catch(() => {});
+      setMsg({
+        ok: false,
+        text:
+          e instanceof ApiError && e.status === 422
+            ? "Anthropic rejected this key — replace it and test again."
+            : "Couldn't reach Anthropic to test the key.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnectCred() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await cytapi.aiCredential.disconnect();
+      onChange(await cytapi.aiCredential.get());
+      setMode("default");
+      setMsg({ ok: true, text: "Disconnected — back on the house account." });
+    } catch {
+      setMsg({ ok: false, text: "Couldn't disconnect. Please try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const SEGMENTS: { key: AiMode; label: string; Icon: typeof KeyRound }[] = [
     { key: "default", label: "Default", Icon: Sparkles },
     { key: "api_key", label: "API key", Icon: KeyRound },
@@ -725,6 +766,38 @@ function AiAccountCard({
               }`
             : "On the house account — preview mode, billed to us."}
       </div>
+
+      {/* Connected: test + disconnect + last-checked. */}
+      {cred.connected && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {cred.auth_type === "api_key" && (
+            <button
+              onClick={test}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c] disabled:opacity-60"
+            >
+              {busy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ShieldCheck size={14} />
+              )}
+              Test connection
+            </button>
+          )}
+          <button
+            onClick={disconnectCred}
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
+          >
+            Disconnect
+          </button>
+          {cred.last_validated_at && (
+            <span className="text-[12px] text-dim">
+              Last checked {new Date(cred.last_validated_at).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Segmented switch */}
       <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
