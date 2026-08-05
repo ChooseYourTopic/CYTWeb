@@ -317,8 +317,21 @@ export type DailyReport = {
 
 export type CreateTopicResponse = { topic_id: string | number };
 
+/** The agents/skills/prompts/loops that help complete a goal (shown in a modal). */
+export type GoalGuide = {
+  agents: string[];
+  skills: string[];
+  prompts: string[];
+  loops: string[];
+};
+
 /** One interactive momentum step for a topic. */
-export type TopicGoal = { id: number; title: string; done: boolean };
+export type TopicGoal = {
+  id: number;
+  title: string;
+  done: boolean;
+  guide?: GoalGuide;
+};
 export type TopicGoals = {
   daily: TopicGoal[];
   weekly: TopicGoal[];

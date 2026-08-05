@@ -14,6 +14,12 @@ import {
   CheckSquare,
   Square,
   Gauge,
+  Bot,
+  Wrench,
+  MessageSquare,
+  Repeat,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
 import {
@@ -21,6 +27,7 @@ import {
   ApiError,
   type TopicOverview,
   type TopicGoals,
+  type TopicGoal,
 } from "@/lib/api";
 
 /**
@@ -206,6 +213,157 @@ function ActivateTaskModal({
   );
 }
 
+/** "social_media" -> "Social Media" for display. */
+function prettyAgent(name: string): string {
+  return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * How-to modal for a goal: the agents, skills, prompts, and loops that help
+ * complete this step, plus a way to mark it done.
+ */
+function GoalGuideModal({
+  goal,
+  onClose,
+  onToggleDone,
+}: {
+  goal: TopicGoal;
+  onClose: () => void;
+  onToggleDone: () => void;
+}) {
+  const guide = goal.guide;
+  const [copied, setCopied] = useState<number | null>(null);
+
+  async function copyPrompt(text: string, i: number) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(i);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-[520px] overflow-y-auto rounded-2xl border border-line bg-panel p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[16px] font-bold leading-snug text-ink">
+            {goal.title}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 text-mut transition-colors hover:text-ink"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mt-1 text-[12.5px] text-mut">
+          How to get this done with your agent team.
+        </p>
+
+        {guide?.agents?.length ? (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+              <Bot size={14} className="text-brand" /> Agents
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {guide.agents.map((a) => (
+                <span
+                  key={a}
+                  className="rounded-lg border border-line bg-panel2 px-2 py-1 text-[12px] text-mut"
+                >
+                  {prettyAgent(a)}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {guide?.skills?.length ? (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+              <Wrench size={14} className="text-brand" /> Skills
+            </div>
+            <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-ink/90">
+              {guide.skills.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {guide?.prompts?.length ? (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+              <MessageSquare size={14} className="text-brand" /> Prompts to try
+            </div>
+            <div className="space-y-1.5">
+              {guide.prompts.map((p, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-2 rounded-lg border border-line bg-panel2 px-3 py-2"
+                >
+                  <span className="flex-1 text-[13px] text-ink/90">{p}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyPrompt(p, i)}
+                    aria-label="Copy prompt"
+                    className="shrink-0 text-mut transition-colors hover:text-ink"
+                  >
+                    {copied === i ? (
+                      <Check size={14} className="text-good" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {guide?.loops?.length ? (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+              <Repeat size={14} className="text-brand" /> Loops
+            </div>
+            <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-ink/90">
+              {guide.loops.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onToggleDone}
+            className="rounded-xl border border-line bg-panel2 px-4 py-2 text-[13.5px] font-semibold text-ink transition-colors hover:border-[#31384c]"
+          >
+            {goal.done ? "Mark not done" : "Mark done"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cyt-gradient-bg rounded-xl px-4 py-2 text-[13.5px] font-bold text-bg"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Overview tab — the "living report": effort presets that activate work (each
  * confirmed in a cost modal), then the highest-level decisions as individually
@@ -251,6 +409,10 @@ export function LivingReport({
 
   // Interactive per-topic goals (daily/weekly/monthly momentum steps).
   const [goalGroups, setGoalGroups] = useState<TopicGoals | null>(null);
+  const [activeGoal, setActiveGoal] = useState<{
+    cadence: keyof TopicGoals;
+    goal: TopicGoal;
+  } | null>(null);
   useEffect(() => {
     if (!topicId) return;
     let cancelled = false;
@@ -514,24 +676,31 @@ export function LivingReport({
               {list.length > 0 ? (
                 <ul className="space-y-1">
                   {list.map((g) => (
-                    <li key={g.id}>
+                    <li key={g.id} className="flex items-start gap-2">
                       <button
                         type="button"
                         onClick={() => toggleGoal(cadence, g.id)}
-                        className="flex w-full items-start gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-panel"
+                        aria-label={g.done ? "Mark not done" : "Mark done"}
+                        className="mt-1 shrink-0"
                       >
                         {g.done ? (
-                          <CheckSquare
-                            size={16}
-                            className="mt-0.5 shrink-0 text-good"
-                          />
+                          <CheckSquare size={16} className="text-good" />
                         ) : (
-                          <Square size={16} className="mt-0.5 shrink-0 text-mut" />
+                          <Square size={16} className="text-mut" />
                         )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveGoal({ cadence, goal: g })}
+                        className="group flex flex-1 items-start justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel"
+                      >
                         <span
                           className={`text-[14px] ${g.done ? "text-dim line-through" : "text-ink/90"}`}
                         >
                           {g.title}
+                        </span>
+                        <span className="mt-0.5 shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
+                          How to →
                         </span>
                       </button>
                     </li>
@@ -556,6 +725,21 @@ export function LivingReport({
           submitting={submitting}
           done={done}
           error={error}
+        />
+      )}
+
+      {activeGoal && (
+        <GoalGuideModal
+          goal={activeGoal.goal}
+          onClose={() => setActiveGoal(null)}
+          onToggleDone={() => {
+            toggleGoal(activeGoal.cadence, activeGoal.goal.id);
+            setActiveGoal((prev) =>
+              prev
+                ? { ...prev, goal: { ...prev.goal, done: !prev.goal.done } }
+                : prev,
+            );
+          }}
         />
       )}
     </div>
