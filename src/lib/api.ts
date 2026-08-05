@@ -317,6 +317,14 @@ export type DailyReport = {
 
 export type CreateTopicResponse = { topic_id: string | number };
 
+/** One interactive momentum step for a topic. */
+export type TopicGoal = { id: number; title: string; done: boolean };
+export type TopicGoals = {
+  daily: TopicGoal[];
+  weekly: TopicGoal[];
+  monthly: TopicGoal[];
+};
+
 /* ------------------------- Signed-in user (me) ---------------------------- */
 
 export type ViewMode = "basic" | "standard" | "advanced";
@@ -893,6 +901,13 @@ export const cytapi = {
     client.put<{ spend_cap_usd: number | null }>(`/me/topics/${id}/spend-cap`, {
       amount,
     }),
+  // Interactive per-topic goals (daily / weekly / monthly momentum steps).
+  topicGoals: (id: string | number) =>
+    client.get<{ goals: TopicGoals }>(`/me/topics/${id}/goals`),
+  toggleTopicGoal: (id: string | number, goalId: number) =>
+    client.post<{ id: number; done: boolean }>(
+      `/me/topics/${id}/goals/${goalId}/toggle`,
+    ),
   updateProfile: (patch: {
     name?: string | null;
     nickname?: string | null;

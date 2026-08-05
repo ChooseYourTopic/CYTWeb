@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -11,10 +11,17 @@ import {
   Loader2,
   X,
   CheckCircle2,
+  CheckSquare,
+  Square,
   Gauge,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
-import { cytapi, ApiError, type TopicOverview } from "@/lib/api";
+import {
+  cytapi,
+  ApiError,
+  type TopicOverview,
+  type TopicGoals,
+} from "@/lib/api";
 
 /**
  * Effort presets. Each sets the project's daily spend cap and kicks off work —
@@ -215,9 +222,6 @@ export function LivingReport({
   const items = overview?.items ?? [];
   const valueProp = items.find((i) => i.id === "value-prop");
   const plan = items.find((i) => i.id === "plan");
-  const goals = items.filter(
-    (i) => typeof i.id === "string" && i.id.startsWith("ov-goal-"),
-  );
   const execSummary = overview?.exec_summary;
   const projectName = overview?.topic || "your project";
   const nextSteps = overview?.recommended_next_steps ?? [];
@@ -244,6 +248,41 @@ export function LivingReport({
   const [accelOpen, setAccelOpen] = useState(false);
   const [accelBusy, setAccelBusy] = useState(false);
   const [accelMsg, setAccelMsg] = useState<string | null>(null);
+
+  // Interactive per-topic goals (daily/weekly/monthly momentum steps).
+  const [goalGroups, setGoalGroups] = useState<TopicGoals | null>(null);
+  useEffect(() => {
+    if (!topicId) return;
+    let cancelled = false;
+    cytapi
+      .topicGoals(topicId)
+      .then((r) => {
+        if (!cancelled) setGoalGroups(r.goals);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId]);
+
+  function flip(groups: TopicGoals, cadence: keyof TopicGoals, goalId: number) {
+    return {
+      ...groups,
+      [cadence]: groups[cadence].map((g) =>
+        g.id === goalId ? { ...g, done: !g.done } : g,
+      ),
+    };
+  }
+
+  async function toggleGoal(cadence: keyof TopicGoals, goalId: number) {
+    if (!topicId) return;
+    setGoalGroups((prev) => (prev ? flip(prev, cadence, goalId) : prev)); // optimistic
+    try {
+      await cytapi.toggleTopicGoal(topicId, goalId);
+    } catch {
+      setGoalGroups((prev) => (prev ? flip(prev, cadence, goalId) : prev)); // revert
+    }
+  }
 
   async function invokeOrchestrator(intent: "run" | "plan" | "review") {
     if (!topicId || accelBusy) return;
@@ -457,19 +496,56 @@ export function LivingReport({
         </CollapsibleSection>
       )}
 
-      {goals.length > 0 && (
-        <CollapsibleSection
-          title={goals.length > 1 ? "Goals" : "Goal"}
-          open={isOpen("goals")}
-          onToggle={() => toggle("goals")}
-        >
-          <ul className="list-disc space-y-1 pl-5 text-[14px] text-ink/90">
-            {goals.map((g) => (
-              <li key={g.id}>{g.summary}</li>
-            ))}
-          </ul>
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection
+        title="Goals"
+        open={isOpen("goals")}
+        onToggle={() => toggle("goals")}
+      >
+        <p className="mb-3 text-[12.5px] text-mut">
+          Small steps to keep {projectName} moving — check them off as you go.
+        </p>
+        {(["daily", "weekly", "monthly"] as const).map((cadence) => {
+          const list = goalGroups?.[cadence] ?? [];
+          return (
+            <div key={cadence} className="mb-3 last:mb-0">
+              <div className="mb-1.5 text-[11px] uppercase tracking-wide text-dim">
+                {cadence}
+              </div>
+              {list.length > 0 ? (
+                <ul className="space-y-1">
+                  {list.map((g) => (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGoal(cadence, g.id)}
+                        className="flex w-full items-start gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-panel"
+                      >
+                        {g.done ? (
+                          <CheckSquare
+                            size={16}
+                            className="mt-0.5 shrink-0 text-good"
+                          />
+                        ) : (
+                          <Square size={16} className="mt-0.5 shrink-0 text-mut" />
+                        )}
+                        <span
+                          className={`text-[14px] ${g.done ? "text-dim line-through" : "text-ink/90"}`}
+                        >
+                          {g.title}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[13px] text-dim">
+                  {goalGroups ? "No steps this period." : "Loading…"}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </CollapsibleSection>
 
       {pendingTier && (
         <ActivateTaskModal
