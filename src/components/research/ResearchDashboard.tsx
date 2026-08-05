@@ -386,7 +386,9 @@ export function ResearchDashboard({
               />
             )}
             {active === "context" && <ContextPanel topicId={topicId} />}
-            {active === "integrations" && <IntegrationsPanel />}
+            {active === "integrations" && (
+              <IntegrationsPanel topicId={topicId} />
+            )}
             {active === "models" && <ModelsPanel />}
             {active === "status" && <StatusPanel topicId={topicId} />}
             {active === "automations" && <AutomationsPanel />}

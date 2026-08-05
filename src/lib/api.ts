@@ -933,6 +933,26 @@ export const cytapi = {
     client.post<{ id: number; done: boolean }>(
       `/me/topics/${id}/goals/${goalId}/toggle`,
     ),
+
+  // Per-topic integrations — connect a service with a token / secret key. The
+  // secret is stored encrypted server-side and never returned (status only).
+  topicIntegrations: (id: string | number) =>
+    client.get<{
+      connections: { provider: string; status: string; connected_at: string | null }[];
+    }>(`/me/topics/${id}/integrations`),
+  saveIntegration: (
+    id: string | number,
+    provider: string,
+    credentials: Record<string, string>,
+  ) =>
+    client.put<{ provider: string; status: string; fields: string[] }>(
+      `/me/topics/${id}/integrations/${provider}`,
+      { credentials },
+    ),
+  disconnectIntegration: (id: string | number, provider: string) =>
+    client.del<{ provider: string; status: string }>(
+      `/me/topics/${id}/integrations/${provider}`,
+    ),
   updateProfile: (patch: {
     name?: string | null;
     nickname?: string | null;
