@@ -121,6 +121,24 @@ export default function SettingsPage() {
           Your profile, engine preferences, and how your agents are powered.
         </p>
 
+        {me?.profile_id && (
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-line bg-panel2 px-4 py-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-dim">
+                Profile ID
+              </div>
+              <div className="font-mono text-[17px] font-semibold text-ink">
+                {me.profile_id}
+              </div>
+            </div>
+            <div className="text-right text-[11.5px] leading-tight text-dim">
+              Everything about your account is
+              <br />
+              organized under this profile ID.
+            </div>
+          </div>
+        )}
+
         {error && <p className="mt-4 text-[13px] text-bad">{error}</p>}
 
         <div className="mt-6 grid gap-4">
@@ -247,6 +265,13 @@ function ProfileCard({ me }: { me: MeProfile }) {
             />
           </Field>
         </div>
+        <Field label="Affiliate ID — your referral code">
+          <input
+            className="cyt-input font-mono opacity-60"
+            value={me.affiliate_id ?? "—"}
+            readOnly
+          />
+        </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button

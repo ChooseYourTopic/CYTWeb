@@ -340,8 +340,12 @@ export type License = {
 
 export type MeProfile = {
   id: number;
+  // Master profile id shown at the top of the profile, e.g. "CYT-PRO-000123".
+  profile_id?: string | null;
   // Permanent branded account number, e.g. "CYT-000123".
   account_number?: string | null;
+  // Referral / affiliate code, e.g. "CYT-AF-000123".
+  affiliate_id?: string | null;
   license?: License;
   name: string | null;
   nickname: string | null;
