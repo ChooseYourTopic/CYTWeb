@@ -276,15 +276,15 @@ export function ResearchDashboard({
     <main className="mx-auto max-w-[1180px] px-6 pb-16">
       {/* Top bar */}
       <header className="mb-6 mt-6 flex items-center justify-between gap-3">
-        <a
-          href="/"
+        <Link
+          href="/start"
           className="flex items-center gap-3 text-[17px] font-bold tracking-tight text-ink"
         >
           <span className="cyt-gradient-bg grid h-7 w-7 place-items-center rounded-lg text-[13px] font-extrabold text-bg">
             {BRAND.MARK}
           </span>
           {BRAND.APP_NAME}
-        </a>
+        </Link>
 
         <div className="flex items-center gap-2">
           <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
