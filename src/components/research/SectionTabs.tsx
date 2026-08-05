@@ -45,6 +45,18 @@ export const CORE_SECTIONS: SectionKey[] = [
 ];
 
 /**
+ * The essentials-only "Basic" view: the core research story with none of the
+ * operational tabs. A strict subset of CORE_SECTIONS.
+ */
+export const BASIC_SECTIONS: SectionKey[] = [
+  "overview",
+  "competitors",
+  "market",
+  "drafts",
+  "report",
+];
+
+/**
  * Tabbed report canvas switcher with a per-tab "new results" badge fed by the
  * research store (WS bumps the counter; clicking a tab flushes it).
  */
@@ -54,11 +66,13 @@ export function SectionTabs() {
   const setActive = useResearchStore((s) => s.setActiveSection);
   const viewMode = useResearchStore((s) => s.viewMode);
 
-  // Standard view shows only the core five; advanced reveals every tab.
+  // Basic = essentials only; Standard = the core set; Expert (advanced) = every tab.
   const visible =
     viewMode === "advanced"
       ? SECTIONS
-      : SECTIONS.filter((s) => CORE_SECTIONS.includes(s.key));
+      : viewMode === "basic"
+        ? SECTIONS.filter((s) => BASIC_SECTIONS.includes(s.key))
+        : SECTIONS.filter((s) => CORE_SECTIONS.includes(s.key));
 
   return (
     <div className="flex flex-wrap gap-1 border-b border-line px-3 py-2.5">

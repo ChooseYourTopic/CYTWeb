@@ -560,7 +560,8 @@ function PreferencesCard({ me }: { me: MeProfile }) {
           <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
             {(
               [
-                { key: "standard", label: "Standard", hint: "Core five tabs" },
+                { key: "basic", label: "Basic", hint: "Essentials" },
+                { key: "standard", label: "Standard", hint: "Core tabs" },
                 {
                   key: "advanced",
                   label: "Expert",

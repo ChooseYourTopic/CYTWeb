@@ -303,7 +303,7 @@ export type CreateTopicResponse = { topic_id: string | number };
 
 /* ------------------------- Signed-in user (me) ---------------------------- */
 
-export type ViewMode = "standard" | "advanced";
+export type ViewMode = "basic" | "standard" | "advanced";
 
 export type AiExperience = "new" | "advanced";
 export type BusinessExperience = "new" | "experienced";

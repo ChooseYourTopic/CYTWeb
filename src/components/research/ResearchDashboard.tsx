@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { KpiTiles } from "@/components/research/KpiTiles";
-import { SectionTabs, CORE_SECTIONS } from "@/components/research/SectionTabs";
+import {
+  SectionTabs,
+  CORE_SECTIONS,
+  BASIC_SECTIONS,
+} from "@/components/research/SectionTabs";
 import { LivingReport } from "@/components/research/LivingReport";
 import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
@@ -27,7 +31,7 @@ import { useSectionData } from "@/hooks/useSectionData";
 import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { useResearchStore } from "@/store/useResearchStore";
-import { cytapi, type TopicOverview } from "@/lib/api";
+import { cytapi, type TopicOverview, type ViewMode } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { ArrowLeft, Search, Pause, Play, Loader2 } from "lucide-react";
@@ -107,22 +111,23 @@ function ProjectPauseToggle({
   );
 }
 
-/** Standard / Expert view switch — collapses or reveals the per-agent tabs. */
+/** Basic / Standard / Expert view switch — collapses or reveals per-agent tabs. */
 function ViewModeToggle({
   mode,
   onChange,
 }: {
-  mode: "standard" | "advanced";
-  onChange: (m: "standard" | "advanced") => void;
+  mode: ViewMode;
+  onChange: (m: ViewMode) => void;
 }) {
-  const opts: { key: "standard" | "advanced"; label: string }[] = [
+  const opts: { key: ViewMode; label: string }[] = [
+    { key: "basic", label: "Basic" },
     { key: "standard", label: "Standard" },
     { key: "advanced", label: "Expert" },
   ];
   return (
     <div
       className="flex rounded-xl border border-line bg-panel2 p-0.5"
-      title="Standard shows the core tabs; Expert reveals every per-agent tab"
+      title="Basic shows the essentials; Standard the core tabs; Expert every per-agent tab"
     >
       {opts.map((o) => (
         <button
@@ -236,14 +241,20 @@ export function ResearchDashboard({
     };
   }, [setViewMode]);
 
-  // If the active tab is hidden in Standard view, fall back to Overview.
+  // If the active tab is hidden in the current view, fall back to Overview.
   useEffect(() => {
-    if (viewMode === "standard" && !CORE_SECTIONS.includes(active)) {
+    const allowed =
+      viewMode === "advanced"
+        ? null
+        : viewMode === "basic"
+          ? BASIC_SECTIONS
+          : CORE_SECTIONS;
+    if (allowed && !allowed.includes(active)) {
       setActive("overview");
     }
   }, [viewMode, active, setActive]);
 
-  async function changeViewMode(next: "standard" | "advanced") {
+  async function changeViewMode(next: ViewMode) {
     if (next === viewMode) return;
     setViewMode(next); // optimistic
     try {
