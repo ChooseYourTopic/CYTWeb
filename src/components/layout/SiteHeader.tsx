@@ -6,8 +6,8 @@ import { BRAND } from "@/lib/brand";
 import { cytapi } from "@/lib/api";
 
 /**
- * Shared top bar (logo + nav), auth-aware. Signed in: How it works · Advanced
- * tools · My profile, and the logo returns to the dashboard. Signed out: How it
+ * Shared top bar (logo + nav), auth-aware. Signed in: How it works · Settings ·
+ * Support · Dashboard, and the logo returns to the dashboard. Signed out: How it
  * works · Sign in · Join the waiting list, logo to the landing page.
  */
 export function SiteHeader() {
@@ -54,13 +54,13 @@ export function SiteHeader() {
               How it works
             </Link>
             <Link href="/settings" className={linkCls}>
-              Advanced tools
+              Settings
             </Link>
             <Link href="/support" className={linkCls}>
               Support
             </Link>
             <Link href="/dashboard" className={linkCls}>
-              My profile
+              Dashboard
             </Link>
             {staff && (
               <Link href="/admin" className={`${linkCls} text-brand`}>
