@@ -762,9 +762,21 @@ export const cytapi = {
       companyId ? { headers: sigHeaders(companyId) } : {},
     ),
 
-  // Kick a one-off run of an agent for a topic (manual trigger).
-  agentTrigger: (agentType: string, companyId?: string | number) =>
-    client.post<{ message: string }>(`/agents/${agentType}/trigger${cq(companyId)}`),
+  // Kick a one-off run of an agent for a topic. An optional prompt is sent as a
+  // directive the agent addresses specifically ("Run this prompt" from a goal).
+  agentTrigger: (
+    agentType: string,
+    companyId?: string | number,
+    prompt?: string,
+  ) =>
+    request<{ message: string; task_id?: number }>(
+      `/agents/${agentType}/trigger${cq(companyId)}`,
+      {
+        method: "POST",
+        body: JSON.stringify(prompt ? { prompt } : {}),
+        ...(companyId ? { headers: sigHeaders(companyId) } : {}),
+      },
+    ),
 
   // Tasks list (Decisions panel).
   tasks: (limit = 100) => client.get<Task[]>(`/tasks?limit=${limit}`),

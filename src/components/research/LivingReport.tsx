@@ -20,6 +20,7 @@ import {
   Repeat,
   Copy,
   Check,
+  Send,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
 import {
@@ -224,15 +225,20 @@ function prettyAgent(name: string): string {
  */
 function GoalGuideModal({
   goal,
+  topicId,
   onClose,
   onToggleDone,
 }: {
   goal: TopicGoal;
+  topicId?: string;
   onClose: () => void;
   onToggleDone: () => void;
 }) {
   const guide = goal.guide;
+  const primaryAgent = guide?.agents?.[0];
   const [copied, setCopied] = useState<number | null>(null);
+  const [runningPrompt, setRunningPrompt] = useState<number | null>(null);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
 
   async function copyPrompt(text: string, i: number) {
     try {
@@ -241,6 +247,31 @@ function GoalGuideModal({
       setTimeout(() => setCopied(null), 1500);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function runPrompt(text: string, i: number) {
+    if (!topicId || !primaryAgent || runningPrompt !== null) return;
+    setRunningPrompt(i);
+    setRunMsg(null);
+    try {
+      const r = await cytapi.agentTrigger(primaryAgent, topicId, text);
+      setRunMsg(r.message ?? `Sent to ${prettyAgent(primaryAgent)}.`);
+    } catch {
+      setRunMsg("Couldn't start that run — try again.");
+    } finally {
+      setRunningPrompt(null);
+    }
+  }
+
+  async function triggerAgent(agentType: string) {
+    if (!topicId) return;
+    setRunMsg(null);
+    try {
+      const r = await cytapi.agentTrigger(agentType, topicId);
+      setRunMsg(r.message ?? `Triggered ${prettyAgent(agentType)}.`);
+    } catch {
+      setRunMsg("Couldn't trigger that agent — try again.");
     }
   }
 
@@ -276,12 +307,16 @@ function GoalGuideModal({
             </div>
             <div className="flex flex-wrap gap-1.5">
               {guide.agents.map((a) => (
-                <span
+                <button
                   key={a}
-                  className="rounded-lg border border-line bg-panel2 px-2 py-1 text-[12px] text-mut"
+                  type="button"
+                  onClick={() => triggerAgent(a)}
+                  disabled={!topicId}
+                  title={topicId ? `Trigger ${prettyAgent(a)} for this topic` : undefined}
+                  className="rounded-lg border border-line bg-panel2 px-2 py-1 text-[12px] text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:cursor-default disabled:hover:border-line disabled:hover:text-mut"
                 >
                   {prettyAgent(a)}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -302,8 +337,15 @@ function GoalGuideModal({
 
         {guide?.prompts?.length ? (
           <div className="mt-4">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
-              <MessageSquare size={14} className="text-brand" /> Prompts to try
+            <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px] font-semibold text-ink">
+              <span className="flex items-center gap-1.5">
+                <MessageSquare size={14} className="text-brand" /> Prompts to try
+              </span>
+              {primaryAgent ? (
+                <span className="text-[11px] font-normal text-dim">
+                  runs on {prettyAgent(primaryAgent)}
+                </span>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               {guide.prompts.map((p, i) => (
@@ -312,18 +354,33 @@ function GoalGuideModal({
                   className="flex items-start gap-2 rounded-lg border border-line bg-panel2 px-3 py-2"
                 >
                   <span className="flex-1 text-[13px] text-ink/90">{p}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyPrompt(p, i)}
-                    aria-label="Copy prompt"
-                    className="shrink-0 text-mut transition-colors hover:text-ink"
-                  >
-                    {copied === i ? (
-                      <Check size={14} className="text-good" />
-                    ) : (
-                      <Copy size={14} />
-                    )}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => copyPrompt(p, i)}
+                      aria-label="Copy prompt"
+                      className="text-mut transition-colors hover:text-ink"
+                    >
+                      {copied === i ? (
+                        <Check size={14} className="text-good" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => runPrompt(p, i)}
+                      disabled={!topicId || !primaryAgent || runningPrompt !== null}
+                      className="inline-flex items-center gap-1 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2 py-1 text-[11.5px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-50"
+                    >
+                      {runningPrompt === i ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Send size={12} />
+                      )}
+                      Run
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -342,6 +399,12 @@ function GoalGuideModal({
             </ul>
           </div>
         ) : null}
+
+        {runMsg && (
+          <p className="mt-4 rounded-lg border border-[#1f3d2e] bg-[#0e1c16] px-3 py-2 text-[12.5px] text-good">
+            {runMsg}
+          </p>
+        )}
 
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
@@ -731,6 +794,7 @@ export function LivingReport({
       {activeGoal && (
         <GoalGuideModal
           goal={activeGoal.goal}
+          topicId={topicId}
           onClose={() => setActiveGoal(null)}
           onToggleDone={() => {
             toggleGoal(activeGoal.cadence, activeGoal.goal.id);
