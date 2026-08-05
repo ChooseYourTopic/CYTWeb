@@ -359,6 +359,12 @@ function AffiliateCard({ me }: { me: MeProfile }) {
           </div>
         )}
       </div>
+      <Link
+        href="/refer"
+        className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline"
+      >
+        <Share2 size={14} /> Open the share screen to show a friend
+      </Link>
     </Card>
   );
 }

@@ -13,6 +13,7 @@ import {
   Search,
   FolderOpen,
   Settings,
+  Share2,
   Pause,
   Play,
   Sparkles,
@@ -310,6 +311,12 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/refer"
+              className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+            >
+              <Share2 size={14} /> Refer
+            </Link>
             <Link
               href="/settings"
               className="flex items-center gap-2 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
