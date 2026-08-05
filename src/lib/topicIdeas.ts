@@ -99,6 +99,19 @@ export const TOPIC_CATALOG: IdeaCategory[] = [
       "a dating app for houseplants",
       "a bakery that only sells corner pieces",
       "socks engineered to never lose their pair",
+      "an umbrella that texts you before it rains",
+      "alarm clocks that only stop after a push-up",
+      "a translator for what your cat's meow really means",
+      "noise-cancelling headphones for your inner critic",
+      "a courier service run by suspiciously fast tortoises",
+      "a gym you can only enter while it's raining",
+      "smart mirrors that hype you up before meetings",
+      "a museum for expired coupons and dead batteries",
+      "a meal kit for people who only eat the crispy bits",
     ],
   },
 ];
+
+/** A rotating set of playful pre-selects surfaced at the bottom of /start. */
+export const WILDCARD_TOPICS: string[] =
+  TOPIC_CATALOG.find((c) => c.category === "Just for Fun")?.ideas ?? [];

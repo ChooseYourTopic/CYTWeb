@@ -22,7 +22,7 @@ import {
   type BusinessExperience,
   type SocialPlatform,
 } from "@/lib/api";
-import { TOPIC_CATALOG } from "@/lib/topicIdeas";
+import { TOPIC_CATALOG, WILDCARD_TOPICS } from "@/lib/topicIdeas";
 
 type Clarity = "know" | "idea";
 type YesNo = "yes" | "no";
@@ -376,6 +376,26 @@ export default function StartPage() {
                     <Plus size={14} className="shrink-0 text-brand" /> {idea}
                   </button>
                 ))}
+              </div>
+
+              {/* Feeling silly? Always-visible playful pre-selects. */}
+              <div className="mt-6">
+                <div className="mb-2 text-[13px] font-semibold text-mut">
+                  Feeling silly? 🤪
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {WILDCARD_TOPICS.map((idea) => (
+                    <button
+                      key={idea}
+                      type="button"
+                      onClick={() => start(idea)}
+                      disabled={busy}
+                      className="rounded-full border border-line bg-panel2 px-3 py-1.5 text-[12px] text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:opacity-60"
+                    >
+                      {idea}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
