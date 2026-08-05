@@ -3,7 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Loader2, Plus, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowLeft,
+  Loader2,
+  Plus,
+  Sparkles,
+  Lightbulb,
+  Blocks,
+  ClipboardList,
+  Rocket,
+} from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
   cytapi,
@@ -258,17 +268,44 @@ export default function StartPage() {
               <ArrowLeft size={14} /> Back
             </button>
 
-            {clarity === "idea" ? (
-              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
-                Let&apos;s find your idea
-              </h1>
-            ) : (
-              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
-                What do you want to build?
-              </h1>
-            )}
+            {/* The four-stage journey — you're at "Invent" (choosing the idea);
+                Assemble, Plan and Implement are what your agent crew does next. */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(
+                [
+                  { key: "invent", label: "Invent", hint: "Pick your idea", icon: Lightbulb },
+                  { key: "assemble", label: "Assemble", hint: "Build the company", icon: Blocks },
+                  { key: "plan", label: "Plan", hint: "Map the work", icon: ClipboardList },
+                  { key: "implement", label: "Implement", hint: "Ship it", icon: Rocket },
+                ] as const
+              ).map((s, i) => {
+                const active = s.key === "invent";
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    disabled={!active}
+                    aria-current={active ? "step" : undefined}
+                    className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      active
+                        ? "cyt-gradient-bg border-transparent text-bg"
+                        : "border-line bg-panel2 text-mut"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
+                      <Icon size={15} /> {s.label}
+                    </span>
+                    <span className={`text-[11px] ${active ? "text-bg/80" : "text-dim"}`}>
+                      {i + 1}. {s.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             <p className="text-[14px] text-mut">
-              Type your topic, or pick one of the ideas below.
+              You&apos;re at <span className="text-ink">Invent</span> — type your
+              topic, or pick one of the ideas below.
             </p>
 
             <div className="flex gap-2">
