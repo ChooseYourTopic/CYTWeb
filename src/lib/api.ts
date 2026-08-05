@@ -477,6 +477,30 @@ export type MyTopicsResponse = {
   topics: MyTopic[];
 };
 
+// XTKRecall MCP paid add-on — a managed, hosted knowledge/memory vault reachable
+// over MCP. Per-user grain (serves all the owner's topics). Secrets are never
+// returned; the provisioned key is exposed only masked, and only while entitled.
+export type XtkRecallStatus = {
+  entitlement_key: string;
+  entitled: boolean;
+  status: "none" | "active" | "canceled" | string;
+  plan: { name: string; price_cents: number };
+  provisioned: boolean;
+  endpoint: string | null;
+  namespace: string | null;
+  masked_key: string | null;
+  granted_at: string | null;
+  canceled_at: string | null;
+  billing_live: boolean;
+};
+
+/** A Stripe Checkout session (add-on subscribe). `url` is where the browser goes. */
+export type CheckoutSession = {
+  url: string;
+  id: string;
+  simulated: boolean;
+};
+
 // Bring-your-own AI credential — how the signed-in user's agent work bills to
 // their own account. Secrets are never returned; this is status only.
 export type AiCredential = {
@@ -953,6 +977,20 @@ export const cytapi = {
     client.del<{ provider: string; status: string }>(
       `/me/topics/${id}/integrations/${provider}`,
     ),
+
+  // XTKRecall MCP paid add-on — the hosted vault. Status flips the Integrations
+  // tile between "Subscribe" (not entitled) and manage/show-endpoint (entitled).
+  // Subscribe returns a Stripe Checkout URL; the entitlement is granted only after
+  // payment clears (webhook), so the caller re-fetches status on return. Cancel
+  // revokes + returns the now-fail-closed status.
+  xtkrecall: {
+    status: (id: string | number) =>
+      client.get<XtkRecallStatus>(`/me/topics/${id}/xtkrecall`),
+    subscribe: (id: string | number) =>
+      client.post<CheckoutSession>(`/me/topics/${id}/xtkrecall/subscribe`),
+    cancel: (id: string | number) =>
+      client.del<XtkRecallStatus>(`/me/topics/${id}/xtkrecall`),
+  },
   updateProfile: (patch: {
     name?: string | null;
     nickname?: string | null;

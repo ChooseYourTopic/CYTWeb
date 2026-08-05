@@ -33,7 +33,7 @@ export const INTEGRATIONS: IntegrationDef[] = [
     key: "xtkrecall_mcp",
     name: "XTKRecall MCP",
     category: "Knowledge",
-    desc: "Connect your XTKRecall vault over MCP — bring your agents, skills, and context.",
+    desc: "A managed, hosted knowledge & memory vault over MCP — we provision it for you.",
     color: "#7C3AED",
     initial: "X",
     fields: [
