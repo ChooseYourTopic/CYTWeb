@@ -83,6 +83,19 @@ export const client = {
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+// Per-topic access signatures (owner + license-bound HMAC) learned from the topic
+// list and overview, echoed back as X-Topic-Signature so the backend validates the
+// topic itself, not just its numeric id. Absent = the server falls back to the
+// ownership check, so this is purely additive hardening.
+const topicSignatures = new Map<string, string>();
+export function rememberTopicSig(id: string | number, sig?: string | null) {
+  if (sig) topicSignatures.set(String(id), sig);
+}
+function sigHeaders(id: string | number): Record<string, string> {
+  const sig = topicSignatures.get(String(id));
+  return sig ? { "X-Topic-Signature": sig } : {};
+}
+
 /* ----------------------------- Contract types ----------------------------- */
 
 export type ActivityLevel = "info" | "success" | "warning" | "error";
@@ -713,11 +726,17 @@ export const cytapi = {
 
   // Agent status grid (polled by useAgentStatus), scoped to a topic/company.
   agentStatus: (companyId?: string | number) =>
-    client.get<AgentStatus[]>(`/agents/status${cq(companyId)}`),
+    request<AgentStatus[]>(
+      `/agents/status${cq(companyId)}`,
+      companyId ? { headers: sigHeaders(companyId) } : {},
+    ),
 
   // Full working picture for one agent: skills, queue, process (runs), actions.
   agentDetail: (agentType: string, companyId?: string | number) =>
-    client.get<AgentDetail>(`/agents/${agentType}/detail${cq(companyId)}`),
+    request<AgentDetail>(
+      `/agents/${agentType}/detail${cq(companyId)}`,
+      companyId ? { headers: sigHeaders(companyId) } : {},
+    ),
 
   // Kick a one-off run of an agent for a topic (manual trigger).
   agentTrigger: (agentType: string, companyId?: string | number) =>
@@ -735,11 +754,17 @@ export const cytapi = {
 
   // Finance snapshot (spend / MRR tiles), scoped to a topic/company.
   financeSummary: (companyId?: string | number) =>
-    client.get<FinanceSummary>(`/finance/summary${cq(companyId)}`),
+    request<FinanceSummary>(
+      `/finance/summary${cq(companyId)}`,
+      companyId ? { headers: sigHeaders(companyId) } : {},
+    ),
 
   // Living-report topic surfaces — normalized from the backend's domain shapes.
   topicOverview: async (id: string): Promise<TopicOverview> => {
-    const raw: any = await client.get(`/topic/${id}/overview`);
+    const raw: any = await request(`/topic/${id}/overview`, {
+      headers: sigHeaders(id),
+    });
+    rememberTopicSig(id, raw?.access_sig);
     const plan = raw?.latest_plan ?? {};
     const items: SectionItem[] = [];
     if (raw?.company?.value_prop)
@@ -780,7 +805,10 @@ export const cytapi = {
     id: string,
     section: FetchableSection,
   ): Promise<SectionItem[]> =>
-    normalizeSection(section, await client.get(`/topic/${id}/${section}`)),
+    normalizeSection(
+      section,
+      await request(`/topic/${id}/${section}`, { headers: sigHeaders(id) }),
+    ),
 
   // Daily report artifacts.
   reports: (limit = 20) => client.get<DailyReport[]>(`/reports?limit=${limit}`),
@@ -788,8 +816,9 @@ export const cytapi = {
 
   // Backfill activity events missed across a WS reconnect, scoped to a topic.
   activitySince: (sinceId: number, companyId?: string | number) =>
-    client.get<ActivityEvent[]>(
+    request<ActivityEvent[]>(
       `/activity?since=${sinceId}${companyId ? `&company_id=${companyId}` : ""}`,
+      companyId ? { headers: sigHeaders(companyId) } : {},
     ),
 
   // Phone-first SMS-code auth. Fail-soft in the UI until CYTAPI ships these.
@@ -834,7 +863,11 @@ export const cytapi = {
 
   // The signed-in user's own surfaces (session-backed; require credentials).
   me: () => client.get<MeProfile>("/me"),
-  myTopics: () => client.get<MyTopicsResponse>("/me/topics"),
+  myTopics: async (): Promise<MyTopicsResponse> => {
+    const res = await client.get<MyTopicsResponse>("/me/topics");
+    res.topics?.forEach((t) => rememberTopicSig(t.id, t.access_sig));
+    return res;
+  },
   // Pause = soft shutdown (checkpoint every agent, hold in-flight work);
   // resume restores the checkpointed queue. Server-owned state.
   pauseTopic: (id: string | number) =>
