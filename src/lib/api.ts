@@ -491,6 +491,33 @@ export type TopicGoals = {
   monthly: TopicGoal[];
 };
 
+/* ------------------------------ Voices / TTS ------------------------------- */
+
+/** Which voice provider a topic connected. `voices` = local Kokoro (OpenAI-compatible). */
+export type VoiceProviderKey = "voices" | "elevenlabs";
+
+/** One voice a topic can pick from (catalog default or the provider's own list). */
+export type Voice = { id: string; name: string; engine: string };
+
+/** GET /me/topics/{id}/voices — connected-voice status; no secrets are returned. */
+export type VoiceStatus = {
+  connected: boolean;
+  mode: "preview" | "live";
+  provider: VoiceProviderKey;
+  default_voice_id: string;
+  voices: Voice[];
+};
+
+/** POST /me/topics/{id}/voices/speak — a synthesized line. `mock` → a simulated URL. */
+export type SpeakResult = {
+  audio_url: string;
+  voice_id: string;
+  source: "topic" | "platform";
+  provider: VoiceProviderKey;
+  mock: boolean;
+  text: string;
+};
+
 /* ------------------------------ Battle pass -------------------------------- */
 
 export type ChallengeDifficulty = "trivial" | "standard" | "hard" | "boss";

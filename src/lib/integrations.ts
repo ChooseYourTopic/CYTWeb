@@ -195,4 +195,19 @@ export const INTEGRATIONS: IntegrationDef[] = [
     affiliateUrl: "https://github.com/remsky/Kokoro-FastAPI",
     docsUrl: "https://github.com/remsky/Kokoro-FastAPI",
   },
+  {
+    key: "elevenlabs",
+    name: "ElevenLabs",
+    category: "Voice",
+    desc: "Realistic AI voices for voiceovers, narration & audio posts — fast Flash TTS for your content agents.",
+    color: "#0B0B0B",
+    initial: "11",
+    fields: [
+      { key: "api_key", label: "API key", placeholder: "sk_…" },
+      { key: "voice_id", label: "Voice ID", placeholder: "21m00Tcm4TlvDq8ikWAM" },
+      { key: "model", label: "Model (optional)", placeholder: "eleven_flash_v2_5" },
+    ],
+    affiliateUrl: "https://elevenlabs.io/",
+    docsUrl: "https://elevenlabs.io/app/settings/api-keys",
+  },
 ];
