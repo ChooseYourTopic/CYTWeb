@@ -212,6 +212,53 @@ export type AgentDetail = {
   actions: AgentAction[];
 };
 
+/* --------------------- Agent standard-schema profile ---------------------- */
+// The single source of truth for the agent-detail view: role, model, skills,
+// loops, prompt summary, cadence, and the owner's realign-override state — all
+// served by the API so the GUI has no hardcoded per-agent data.
+
+export type AgentSkill = { key: string; name: string; description: string };
+
+export type AgentLoop = {
+  key: string;
+  name: string;
+  trigger: string;
+  behavior: string;
+  // Design proposal only (badge it) — the cadence is unchanged.
+  proposed?: boolean;
+};
+
+/** The active "realign with a new prompt" override on an agent, if any. */
+export type AgentPromptState = {
+  summary: string;
+  override_active: boolean;
+  override: { id: number; name: string | null; content: string } | null;
+  extends_count: number;
+};
+
+export type AgentProfile = {
+  agent_type: string;
+  role: string;
+  model: string;
+  prompt_summary: string;
+  cadence: string;
+  skills: AgentSkill[];
+  loops: AgentLoop[];
+  prompt: AgentPromptState;
+};
+
+/** An imported prompt row (agent realign override / extend). */
+export type ImportedPromptRow = {
+  id: number;
+  scope: "agent" | "goal";
+  target_key: string;
+  mode: "override" | "extend";
+  name: string | null;
+  content: string;
+  active: boolean;
+  sort: number;
+};
+
 export type FinanceSummary = {
   mrr_cents: number;
   arr_cents: number;
@@ -951,6 +998,38 @@ export const cytapi = {
     request<AgentDetail>(
       `/agents/${agentType}/detail${cq(companyId)}`,
       companyId ? { headers: sigHeaders(companyId) } : {},
+    ),
+
+  // Standard-schema agent profile(s) for one owned topic — role/model/skills/
+  // loops/prompt-summary/cadence + the realign-override state. Session-authed,
+  // owner-scoped (the /me/topics surface); the agent-detail view populates from
+  // these so there is no hardcoded per-agent data in the front end.
+  agentProfiles: (topicId: string | number) =>
+    client.get<{ agents: AgentProfile[] }>(`/me/topics/${topicId}/agents`),
+  agentProfile: (topicId: string | number, agentType: string) =>
+    client.get<{ agent: AgentProfile }>(
+      `/me/topics/${topicId}/agents/${agentType}`,
+    ),
+
+  // Realign an agent with a new prompt — reuses the imported-prompts mechanism
+  // (scope='agent', mode='override'); PromptResolver applies it fail-safe to the
+  // built-in. Delete the override to revert to the built-in prompt.
+  realignAgent: (
+    topicId: string | number,
+    agentType: string,
+    content: string,
+    name?: string,
+  ) =>
+    client.post<ImportedPromptRow>(`/me/topics/${topicId}/prompts`, {
+      scope: "agent",
+      target_key: agentType,
+      mode: "override",
+      content,
+      ...(name ? { name } : {}),
+    }),
+  deleteAgentPrompt: (topicId: string | number, promptId: number) =>
+    client.del<{ deleted: boolean; id: number }>(
+      `/me/topics/${topicId}/prompts/${promptId}`,
     ),
 
   // Kick a one-off run of an agent for a topic. An optional prompt is sent as a

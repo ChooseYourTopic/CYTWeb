@@ -8,6 +8,7 @@ import {
   cytapi,
   type AgentStatus,
   type AgentDetail,
+  type AgentProfile,
   type PrioritizeResult,
 } from "@/lib/api";
 import { Dialog } from "@/components/research/ProgressiveCard";
@@ -63,16 +64,24 @@ export function AgentStatusGrid({
   const byType = new Map(statuses.map((s) => [s.agent_type, s]));
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [detail, setDetail] = useState<AgentDetail | null>(null);
+  const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   async function open(id: string) {
     setOpenFor(id);
     setDetail(null);
+    setProfile(null);
     setLoadingDetail(true);
+    // The profile (role/skills/loops/prompt) is owner-scoped and drives the view;
+    // the detail (queue/runs/actions) is the live working picture. Fetch both.
+    const detailP = cytapi.agentDetail(id, companyId).catch(() => null);
+    const profileP = companyId
+      ? cytapi.agentProfile(companyId, id).then((r) => r.agent).catch(() => null)
+      : Promise.resolve(null);
     try {
-      setDetail(await cytapi.agentDetail(id, companyId));
-    } catch {
-      /* fail-soft — the modal shows the empty states */
+      const [d, p] = await Promise.all([detailP, profileP]);
+      if (d) setDetail(d);
+      if (p) setProfile(p);
     } finally {
       setLoadingDetail(false);
     }
@@ -84,6 +93,15 @@ export function AgentStatusGrid({
       setDetail(await cytapi.agentDetail(openFor, companyId));
     } catch {
       /* keep the last-good detail */
+    }
+  }, [openFor, companyId]);
+
+  const reloadProfile = useCallback(async () => {
+    if (!openFor || !companyId) return;
+    try {
+      setProfile((await cytapi.agentProfile(companyId, openFor)).agent);
+    } catch {
+      /* keep the last-good profile */
     }
   }, [openFor, companyId]);
 
@@ -127,12 +145,19 @@ export function AgentStatusGrid({
 
       {openFor && (
         <Dialog title={label(openFor)} onClose={() => setOpenFor(null)}>
-          {loadingDetail && !detail ? (
+          {loadingDetail && !detail && !profile ? (
             <div className="py-8 text-center text-[13px] text-mut">
               Loading the agent&apos;s work…
             </div>
-          ) : detail ? (
-            <AgentDetailView d={detail} companyId={companyId} onReload={reload} />
+          ) : detail || profile ? (
+            <AgentDetailView
+              agentType={openFor}
+              d={detail}
+              profile={profile}
+              companyId={companyId}
+              onReload={reload}
+              onReloadProfile={reloadProfile}
+            />
           ) : (
             <div className="py-8 text-center text-[13px] text-dim">
               No data for this agent yet.
@@ -179,25 +204,49 @@ function Row({
 }
 
 function AgentDetailView({
+  agentType,
   d,
+  profile,
   companyId,
   onReload,
+  onReloadProfile,
 }: {
-  d: AgentDetail;
+  agentType: string;
+  d: AgentDetail | null;
+  profile: AgentProfile | null;
   companyId?: string | number;
   onReload: () => Promise<void>;
+  onReloadProfile: () => Promise<void>;
 }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [review, setReview] = useState<PrioritizeResult | null>(null);
   const [triggering, setTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState<string | null>(null);
-  const [tab, setTab] = useState<"queue" | "context">("queue");
+  const [tab, setTab] = useState<"queue" | "context" | "realign">("queue");
   const [ctxText, setCtxText] = useState("");
   const [ctxBusy, setCtxBusy] = useState(false);
   const [ctxMsg, setCtxMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [realignText, setRealignText] = useState("");
+  const [realignBusy, setRealignBusy] = useState(false);
+  const [realignMsg, setRealignMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Live working picture (queue/runs/actions/stats) is fail-soft: absent until
+  // the detail endpoint answers. The profile drives role/skills/loops/prompt.
+  const stats = d?.stats;
+  const queue = d?.queue ?? [];
+  const runs = d?.runs ?? [];
+  const actions = d?.actions ?? [];
+  const role = profile?.role ?? d?.role ?? "";
+  // Skills come from the standard-schema profile (rich objects); fall back to the
+  // detail endpoint's flat names so the panel still renders if the profile 404s.
+  const skills = profile?.skills.length
+    ? profile.skills
+    : (d?.skills ?? []).map((name) => ({ key: name, name, description: "" }));
+  const loops = profile?.loops ?? [];
+  const override = profile?.prompt.override ?? null;
 
   // Where this agent's start-up ritual lives (shown in the description).
-  const startupFile = `agents/${d.agent_type}/startup-ritual.md`;
+  const startupFile = `agents/${agentType}/startup-ritual.md`;
 
   async function saveContext() {
     if (!companyId || !ctxText.trim() || ctxBusy) return;
@@ -205,7 +254,7 @@ function AgentDetailView({
     setCtxMsg(null);
     try {
       const cur = await cytapi.topicContext(companyId);
-      const note = `[${label(d.agent_type)}] ${ctxText.trim()}`;
+      const note = `[${label(agentType)}] ${ctxText.trim()}`;
       const notes = cur.context?.notes ? `${cur.context.notes}\n${note}` : note;
       await cytapi.saveTopicContext(companyId, { notes });
       setCtxText("");
@@ -214,6 +263,37 @@ function AgentDetailView({
       setCtxMsg({ ok: false, text: "Couldn't save. Please try again." });
     } finally {
       setCtxBusy(false);
+    }
+  }
+
+  async function realign() {
+    if (!companyId || !realignText.trim() || realignBusy) return;
+    setRealignBusy(true);
+    setRealignMsg(null);
+    try {
+      await cytapi.realignAgent(companyId, agentType, realignText.trim());
+      setRealignText("");
+      setRealignMsg({ ok: true, text: "Realigned — this prompt now steers the agent." });
+      await onReloadProfile();
+    } catch {
+      setRealignMsg({ ok: false, text: "Couldn't realign — please try again." });
+    } finally {
+      setRealignBusy(false);
+    }
+  }
+
+  async function revertRealign() {
+    if (!companyId || !override || realignBusy) return;
+    setRealignBusy(true);
+    setRealignMsg(null);
+    try {
+      await cytapi.deleteAgentPrompt(companyId, override.id);
+      setRealignMsg({ ok: true, text: "Reverted to the built-in prompt." });
+      await onReloadProfile();
+    } catch {
+      setRealignMsg({ ok: false, text: "Couldn't revert — please try again." });
+    } finally {
+      setRealignBusy(false);
     }
   }
 
@@ -235,7 +315,7 @@ function AgentDetailView({
     setTriggering(true);
     setTriggerMsg(null);
     try {
-      await cytapi.agentTrigger(d.agent_type, companyId);
+      await cytapi.agentTrigger(agentType, companyId);
       setTriggerMsg("Queued — this agent is running now.");
       // Give the job a moment to land, then refresh the run/queue view.
       setTimeout(() => void onReload(), 1500);
@@ -250,13 +330,23 @@ function AgentDetailView({
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[13px] text-mut">{d.role}</div>
-          <div className="mt-0.5 text-[11.5px] text-dim">
-            Startup ritual ·{" "}
-            <code className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut">
-              {startupFile}
-            </code>
+          <div className="text-[13px] text-mut">{role}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-dim">
+            {profile?.model && (
+              <code className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut">
+                {profile.model}
+              </code>
+            )}
+            <span>
+              Startup ritual ·{" "}
+              <code className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut">
+                {startupFile}
+              </code>
+            </span>
           </div>
+          {profile?.cadence && (
+            <div className="mt-0.5 text-[11.5px] text-dim">{profile.cadence}</div>
+          )}
         </div>
         <button
           onClick={runNow}
@@ -274,38 +364,76 @@ function AgentDetailView({
       </div>
       {triggerMsg && <div className="text-[12px] text-good">{triggerMsg}</div>}
 
+      {profile?.prompt.override_active && (
+        <div className="rounded-lg border border-[#223257] bg-brand/10 px-3 py-2 text-[12px] text-brand">
+          A custom prompt is realigning this agent. Manage it in the Realign tab.
+        </div>
+      )}
+
       <div>
         <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
           Skills
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {d.skills.map((sk) => (
+          {skills.map((sk) => (
             <span
-              key={sk}
+              key={sk.key}
+              title={sk.description || undefined}
               className="rounded-full border border-[#223257] bg-[#16203a] px-2.5 py-1 text-[11px] text-brand"
             >
-              {sk}
+              {sk.name}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-5 text-[12px]">
-        <span className="text-mut">
-          <span className="text-ink">{d.stats.runs_total}</span> runs
-        </span>
-        <span className="text-mut">
-          <span className="text-ink">{d.stats.tasks_pending}</span> queued
-        </span>
-        <span className="text-mut">
-          <span className="text-ink">{d.stats.tasks_total}</span> tasks
-        </span>
-        <span className="text-mut">
-          <span className="text-ink">${d.stats.cost_usd}</span> spend
-        </span>
-      </div>
+      {loops.length > 0 && (
+        <div>
+          <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
+            Loops
+          </div>
+          <div className="space-y-1.5">
+            {loops.map((lp) => (
+              <div
+                key={lp.key}
+                className="rounded-lg border border-line bg-panel2 p-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12.5px] font-semibold text-ink">
+                    {lp.name}
+                  </span>
+                  {lp.proposed && (
+                    <span className="rounded-full border border-[#3a2f12] bg-[#1c160a] px-2 py-0.5 text-[10px] uppercase tracking-wide text-warn">
+                      Proposed
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[11px] text-dim">{lp.trigger}</div>
+                <div className="mt-1 text-[12px] text-mut">{lp.behavior}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Queue / Add context tabs */}
+      {stats && (
+        <div className="flex flex-wrap gap-5 text-[12px]">
+          <span className="text-mut">
+            <span className="text-ink">{stats.runs_total}</span> runs
+          </span>
+          <span className="text-mut">
+            <span className="text-ink">{stats.tasks_pending}</span> queued
+          </span>
+          <span className="text-mut">
+            <span className="text-ink">{stats.tasks_total}</span> tasks
+          </span>
+          <span className="text-mut">
+            <span className="text-ink">${stats.cost_usd}</span> spend
+          </span>
+        </div>
+      )}
+
+      {/* Queue / Add context / Realign tabs */}
       <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
         <button
           type="button"
@@ -329,13 +457,24 @@ function AgentDetailView({
         >
           Add context
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("realign")}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+            tab === "realign"
+              ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
+              : "text-mut hover:text-ink"
+          }`}
+        >
+          Realign
+        </button>
       </div>
 
       {tab === "queue" ? (
         <>
       <div>
         <div className="mb-1 text-[11px] uppercase tracking-wider text-dim">
-          Queue ({d.queue.length}) — assigned by the team lead, by priority
+          Queue ({queue.length}) — assigned by the team lead, by priority
         </div>
 
         {review && (
@@ -367,10 +506,10 @@ function AgentDetailView({
           </div>
         )}
 
-        {d.queue.length === 0 ? (
+        {queue.length === 0 ? (
           <div className="py-2 text-[12px] text-dim">Nothing queued.</div>
         ) : (
-          d.queue.map((t) => (
+          queue.map((t) => (
             <div
               key={t.id}
               className="mb-2 rounded-lg border border-line bg-panel2 p-3 last:mb-0"
@@ -459,12 +598,12 @@ function AgentDetailView({
 
       <div>
         <div className="mb-1 text-[11px] uppercase tracking-wider text-dim">
-          Process ({d.runs.length}) — what it did, run by run
+          Process ({runs.length}) — what it did, run by run
         </div>
-        {d.runs.length === 0 ? (
+        {runs.length === 0 ? (
           <div className="py-2 text-[12px] text-dim">No runs yet.</div>
         ) : (
-          d.runs.map((r) => (
+          runs.map((r) => (
             <Row
               key={r.id}
               left={r.summary ?? r.run_type}
@@ -479,10 +618,10 @@ function AgentDetailView({
         <div className="mb-1 text-[11px] uppercase tracking-wider text-dim">
           Recent actions
         </div>
-        {d.actions.length === 0 ? (
+        {actions.length === 0 ? (
           <div className="py-2 text-[12px] text-dim">No actions yet.</div>
         ) : (
-          d.actions.map((a) => (
+          actions.map((a) => (
             <div key={a.id} className="border-b border-line py-1.5 last:border-0">
               <span className="text-[13px] text-ink">{a.summary}</span>
               <span className="ml-2 text-[11px] text-dim">
@@ -493,10 +632,10 @@ function AgentDetailView({
         )}
       </div>
         </>
-      ) : (
+      ) : tab === "context" ? (
         <div>
           <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
-            Add context for {label(d.agent_type)}
+            Add context for {label(agentType)}
           </div>
           <textarea
             className="cyt-input min-h-[110px]"
@@ -519,6 +658,74 @@ function AgentDetailView({
                 className={`text-[12px] ${ctxMsg.ok ? "text-good" : "text-bad"}`}
               >
                 {ctxMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
+            Realign {label(agentType)} with a new prompt
+          </div>
+
+          {profile?.prompt.summary && (
+            <div className="mb-3 rounded-lg border border-line bg-panel2 p-3">
+              <div className="text-[10px] uppercase tracking-wide text-dim">
+                Built-in mandate
+              </div>
+              <div className="mt-0.5 text-[12px] text-mut">
+                {profile.prompt.summary}
+              </div>
+            </div>
+          )}
+
+          {override ? (
+            <div className="mb-3 rounded-lg border border-[#223257] bg-brand/10 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] font-semibold text-brand">
+                  Active override{override.name ? ` · ${override.name}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={revertRealign}
+                  disabled={realignBusy}
+                  title="Delete the override and revert to the built-in prompt"
+                  className="shrink-0 rounded-lg border border-[#223257] px-2.5 py-1 text-[12px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
+                >
+                  Revert to built-in
+                </button>
+              </div>
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-panel p-2 text-[11px] text-mut">
+                {override.content}
+              </pre>
+            </div>
+          ) : (
+            <div className="mb-3 text-[12px] text-dim">
+              No override — this agent runs on its built-in prompt.
+            </div>
+          )}
+
+          <textarea
+            className="cyt-input min-h-[130px]"
+            value={realignText}
+            onChange={(e) => setRealignText(e.target.value)}
+            placeholder="Write a new system prompt to steer this agent. It replaces the built-in prompt (fail-safe: revert any time)."
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={realign}
+              disabled={realignBusy || !realignText.trim() || !companyId}
+              className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-bold text-bg disabled:opacity-60"
+            >
+              {realignBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+              Realign agent
+            </button>
+            {realignMsg && (
+              <span
+                className={`text-[12px] ${realignMsg.ok ? "text-good" : "text-bad"}`}
+              >
+                {realignMsg.text}
               </span>
             )}
           </div>
