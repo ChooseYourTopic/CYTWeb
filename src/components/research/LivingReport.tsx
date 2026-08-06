@@ -30,6 +30,8 @@ import {
   type TopicOverview,
   type TopicGoals,
   type TopicGoal,
+  type RecommendedStep,
+  type TopicActivity,
 } from "@/lib/api";
 
 /**
@@ -219,6 +221,154 @@ function ActivateTaskModal({
 function prettyAgent(name: string): string {
   if (AGENT_DISPLAY_NAMES[name]) return AGENT_DISPLAY_NAMES[name];
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * The always-alive signal: tells the user whether the crew is working, work is
+ * queued and waiting on an agent, the project is idle, or nothing has ever run
+ * (a gentle stall hint that points at how to kick it off). Without this a blank
+ * dashboard is indistinguishable from a broken one.
+ */
+function WorkStateBanner({ activity }: { activity?: TopicActivity }) {
+  const state = activity?.state ?? "idle";
+  const pending = activity?.pending ?? 0;
+  const running = activity?.running ?? 0;
+  const activeAgents = activity?.active_agents ?? 0;
+
+  const parts: string[] = [];
+  if (activeAgents > 0)
+    parts.push(`${activeAgents} agent${activeAgents === 1 ? "" : "s"} active`);
+  if (running > 0) parts.push(`${running} in progress`);
+  if (pending > 0) parts.push(`${pending} queued`);
+  const detail = parts.join(" · ");
+
+  const config = {
+    working: {
+      cls: "border-[#1f3d2e] bg-[#0e1c16] text-good",
+      icon: <Loader2 size={16} className="animate-spin text-good" />,
+      title: "Your crew is on it",
+      body: detail || "Agents are working this project right now.",
+    },
+    queued: {
+      cls: "border-[#3a3320] bg-[#1a1608] text-warn",
+      icon: <Clock size={16} className="text-warn" />,
+      title: "Work queued — waiting on an agent",
+      body:
+        (detail ? `${detail}. ` : "") +
+        "Tasks are lined up and will start as an agent frees up.",
+    },
+    stalled: {
+      cls: "border-line bg-panel2 text-mut",
+      icon: <Rocket size={16} className="text-brand" />,
+      title: "Nothing has run yet",
+      body:
+        "Your team is standing by. Pick an effort level above, or hit " +
+        "“Accelerate now,” to get the crew started on this project.",
+    },
+    idle: {
+      cls: "border-line bg-panel2 text-mut",
+      icon: <CheckCircle2 size={16} className="text-good" />,
+      title: "All caught up — nothing running right now",
+      body:
+        "No work is in flight. Give the team a new direction or accelerate to " +
+        "push the project forward.",
+    },
+  }[state];
+
+  return (
+    <div
+      className={`animate-rise flex items-start gap-2.5 rounded-[11px] border px-3.5 py-2.5 ${config.cls}`}
+    >
+      <span className="mt-0.5 shrink-0">{config.icon}</span>
+      <div className="min-w-0">
+        <div className="text-[13px] font-semibold">{config.title}</div>
+        <div className="mt-0.5 text-[12.5px] text-mut">{config.body}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A recommended next step rendered as a first-class action: human title, the
+ * why, the owning agent + expected artifact, and a one-click CTA that triggers
+ * the owning agent. Never shows a raw system-trigger label.
+ */
+function NextStepCard({
+  step,
+  topicId,
+}: {
+  step: RecommendedStep;
+  topicId?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const owner = step.owner_role || (step.owner ? prettyAgent(step.owner) : null);
+  const runnable = Boolean(topicId && step.agent_type);
+
+  async function run() {
+    if (!runnable || busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await cytapi.agentTrigger(step.agent_type as string, topicId as string);
+      setMsg(r.message ?? `Sent to ${prettyAgent(step.agent_type as string)}.`);
+    } catch {
+      setMsg("Couldn't start that — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-panel2 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold text-ink">{step.title}</div>
+          {step.why ? (
+            <div className="mt-0.5 text-[12.5px] leading-snug text-mut">
+              {step.why}
+            </div>
+          ) : null}
+        </div>
+        {runnable ? (
+          <button
+            type="button"
+            onClick={run}
+            disabled={busy}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2.5 py-1.5 text-[11.5px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Send size={12} />
+            )}
+            {step.cta ?? "Run"}
+          </button>
+        ) : null}
+      </div>
+      {(owner || step.artifact) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {owner ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[11px] text-mut">
+              <Bot size={11} className="text-brand" />
+              {owner}
+            </span>
+          ) : null}
+          {step.artifact ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[11px] text-mut">
+              <Wrench size={11} className="text-brand" />
+              {step.artifact}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {msg ? (
+        <p className="mt-2 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2 py-1 text-[11.5px] text-good">
+          {msg}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -699,6 +849,9 @@ export function LivingReport({
         ))}
       </div>
 
+      {/* Always-alive signal: queued / working / stalled / idle. */}
+      <WorkStateBanner activity={overview?.activity} />
+
       <CollapsibleSection
         title="Cue Winslow"
         open={isOpen("decided")}
@@ -713,14 +866,16 @@ export function LivingReport({
         onToggle={() => toggle("next_steps")}
       >
         {nextSteps.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-[14px] text-ink/90">
+          <div className="space-y-1.5">
             {nextSteps.map((s, i) => (
-              <li key={i}>{s}</li>
+              <NextStepCard key={s.id ?? i} step={s} topicId={topicId} />
             ))}
-          </ul>
+          </div>
         ) : (
           <p className="text-[13px] text-dim">
-            No recommended steps yet — the team is still planning.
+            {overview?.activity?.state === "stalled"
+              ? "No steps yet — kick off the crew above and the team will plan your next moves."
+              : "No recommended steps yet — the team is still planning."}
           </p>
         )}
       </CollapsibleSection>

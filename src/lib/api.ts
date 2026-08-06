@@ -330,6 +330,33 @@ export type SectionItem = {
   action?: "publish" | "send" | "launch";
 };
 
+/**
+ * A first-class recommended next step: a human action (never a raw system-
+ * trigger label) with the why, owning agent + role, expected artifact, and the
+ * agent to trigger for its CTA.
+ */
+export type RecommendedStep = {
+  id?: number;
+  title: string;
+  why?: string | null;
+  owner?: string | null; // agent_type of the owning agent
+  owner_role?: string | null;
+  artifact?: string | null;
+  agent_type?: string | null; // agent the CTA triggers (null if not runnable)
+  status?: string;
+  cta?: string;
+};
+
+/** Liveness state so a blank-but-alive dashboard reads apart from a stalled one. */
+export type TopicActivity = {
+  state: "working" | "queued" | "stalled" | "idle";
+  pending?: number;
+  running?: number;
+  active_agents?: number;
+  total_runs?: number;
+  last_activity_at?: string | null;
+};
+
 export type TopicOverview = {
   topic: string;
   tagline?: string;
@@ -342,8 +369,10 @@ export type TopicOverview = {
   // Soft-shutdown (pause) state for this topic.
   paused?: boolean;
   paused_at?: string | null;
+  // Liveness snapshot (queued / working / stalled / idle) for the alive-signal.
+  activity?: TopicActivity;
   // The team's recommended next steps + recent achievements for this topic.
-  recommended_next_steps?: string[];
+  recommended_next_steps?: RecommendedStep[];
   recent_achievements?: string[];
   kpis?: {
     tasks_today?: number;
@@ -1122,6 +1151,7 @@ export const cytapi = {
       run_source: raw?.run_source,
       paused: raw?.paused,
       paused_at: raw?.paused_at,
+      activity: raw?.activity,
       recommended_next_steps: raw?.recommended_next_steps ?? [],
       recent_achievements: raw?.recent_achievements ?? [],
       kpis: raw?.kpis ?? {},
