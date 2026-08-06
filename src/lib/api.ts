@@ -595,6 +595,104 @@ export type ChallengeEffect = {
   season_id: number;
 };
 
+/* -------------------- Competitive milestone leaderboard -------------------- */
+// The 29-day BUSINESS RACE: rank opted-in topics by how FAST they hit real
+// milestones (website live → $1 → $1k → volume) + the Social Media Engineer's
+// real reach (views/clicks/conversions). Privacy-safe — no other topic's raw
+// revenue is exposed, only earned milestone badges + days.
+
+export type MilestoneCategory = "business" | "social";
+export type LeaderboardMetricSort =
+  | "speed"
+  | "revenue"
+  | "views"
+  | "clicks"
+  | "conversions";
+
+/** One rung in the milestone catalog (legend/badges). */
+export type MilestoneCatalogItem = {
+  key: string;
+  label: string;
+  icon: string;
+  category: MilestoneCategory;
+  order: number;
+  // Whether a REAL signal backs this today, or it awaits Stripe-live / live X+Ads.
+  real_backed: boolean;
+};
+
+/** An earned milestone on a leaderboard row (with its speed). */
+export type LeaderboardMilestone = {
+  key: string;
+  label: string;
+  icon: string;
+  category: MilestoneCategory;
+  order: number;
+  days_from_start: number;
+};
+
+/** One business on the race board (privacy-safe projection). */
+export type LeaderboardEntry = {
+  rank: number | null;
+  id: number;
+  name: string;
+  category: string | null;
+  is_you: boolean;
+  milestones: LeaderboardMilestone[];
+  milestones_count: number;
+  business_stage: number; // 0..4 (furthest business milestone)
+  business_stage_label: string;
+  social_count: number;
+  furthest_milestone: string | null;
+  days_from_start: number | null; // days to the furthest milestone
+  metrics: { views: number; clicks: number; conversions: number };
+  started_at: string;
+  days_elapsed: number;
+};
+
+export type LeaderboardResponse = {
+  metric: LeaderboardMetricSort;
+  scope: string;
+  season_days: number;
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+  categories: string[];
+  catalog: MilestoneCatalogItem[];
+  entries: LeaderboardEntry[];
+  you: LeaderboardEntry | null;
+  your_entries: LeaderboardEntry[];
+  filters: {
+    category: string | null;
+    milestone: string | null;
+    metric: LeaderboardMetricSort;
+    q: string | null;
+  };
+};
+
+export type LeaderboardFilters = {
+  category?: string | null;
+  milestone?: string | null;
+  metric?: LeaderboardMetricSort;
+  q?: string | null;
+  page?: number;
+  per_page?: number;
+};
+
+/** A single topic's own race standing (owner-scoped). */
+export type TopicLeaderboard = {
+  opt_in: boolean;
+  rank: number | null;
+  catalog: MilestoneCatalogItem[];
+  milestones: {
+    key: string;
+    category: MilestoneCategory;
+    days_from_start: number;
+    achieved_at: string | null;
+  }[];
+  metrics: { views: number; clicks: number; conversions: number };
+};
+
 /* ------------------------- Signed-in user (me) ---------------------------- */
 
 export type ViewMode = "basic" | "standard" | "advanced";
@@ -1291,6 +1389,27 @@ export const cytapi = {
     client.post<ClaimResult>(`/me/topics/${id}/battlepass/claim`, {
       track,
       tier,
+    }),
+
+  // Competitive milestone leaderboard — the global 29-day business race. Ranks
+  // only opted-in topics, privacy-safe; server-side ranked/filtered/paginated.
+  leaderboard: (filters: LeaderboardFilters = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(filters)
+        .filter(([, v]) => v != null && v !== "")
+        .map(([k, v]) => [k, String(v)]) as [string, string][],
+    ).toString();
+    return client.get<LeaderboardResponse>(
+      `/leaderboard${qs ? `?${qs}` : ""}`,
+    );
+  },
+  // A single topic's own race standing + opt-in flag (owner-scoped).
+  topicLeaderboard: (id: string | number) =>
+    client.get<TopicLeaderboard>(`/me/topics/${id}/leaderboard`),
+  // Opt a topic in/out of the public leaderboard (default OFF for privacy).
+  setLeaderboardOptIn: (id: string | number, optIn: boolean) =>
+    client.put<{ opt_in: boolean }>(`/me/topics/${id}/leaderboard`, {
+      opt_in: optIn,
     }),
 
   // Per-topic integrations — connect a service with a token / secret key. The

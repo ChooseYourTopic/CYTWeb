@@ -4,7 +4,7 @@
 export const BRAND = {
   APP_NAME: "ChooseYourTopic",
   MARK: "C",
-  TAGLINE: "One line to start. Then watch it build itself.",
+  TAGLINE: "One line to start.",
   SUBTAGLINE:
     "Give ChooseYourTopic a topic. An autonomous agent team researches, builds, markets, and runs it in the background — while you stay in a living dashboard and keep investigating as results come in.",
   // Primary accent (kept in sync with --brand / --brand2 in globals.css).

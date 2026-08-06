@@ -22,7 +22,7 @@ const TIERS: Tier[] = [
     name: "Explorer",
     price: "$29",
     cadence: "/mo",
-    blurb: "Start one topic and watch it build itself.",
+    blurb: "Start one topic and let your AI team run with it.",
     cta: "Start with Explorer",
     features: [
       "1 company",

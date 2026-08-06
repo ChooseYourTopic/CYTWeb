@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Loader2,
   Flame,
@@ -9,6 +10,11 @@ import {
   Check,
   Gift,
   Trophy,
+  Medal,
+  ArrowRight,
+  Eye,
+  MousePointerClick,
+  Rocket,
 } from "lucide-react";
 import {
   cytapi,
@@ -17,8 +23,58 @@ import {
   type BattlePassTier,
   type BattlePassTrackKey,
   type PaceBadge,
+  type LeaderboardResponse,
+  type LeaderboardEntry,
+  type LeaderboardMilestone,
+  type TopicLeaderboard,
 } from "@/lib/api";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
+
+/** Rank medal color for the top three; muted chip otherwise. */
+export function rankChipCls(rank: number | null): string {
+  if (rank === 1) return "border-[#7a5c14] bg-[#221a06] text-[#f0c245]";
+  if (rank === 2) return "border-line bg-panel2 text-ink";
+  if (rank === 3) return "border-[#4a3b1a] bg-[#1c1708] text-warn";
+  return "border-line bg-panel2 text-mut";
+}
+
+/** Earned milestone badges for one business (icon + label + speed). */
+export function MilestoneBadges({
+  milestones,
+  max,
+}: {
+  milestones: LeaderboardMilestone[];
+  max?: number;
+}) {
+  const shown = max ? milestones.slice(0, max) : milestones;
+  if (shown.length === 0)
+    return <span className="text-[11.5px] text-dim">No milestones yet</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {shown.map((m) => {
+        const MIcon = iconFor(m.icon);
+        return (
+          <span
+            key={m.key}
+            title={`${m.label} · day ${m.days_from_start}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+              m.category === "business"
+                ? "border-brand/50 bg-brand/10 text-brand"
+                : "border-[#2a3550] bg-[#141a2b] text-[#8ab4ff]"
+            }`}
+          >
+            <MIcon size={11} />
+            {m.label}
+            <span className="font-normal text-dim">· d{m.days_from_start}</span>
+          </span>
+        );
+      })}
+      {max && milestones.length > max ? (
+        <span className="text-[11px] text-dim">+{milestones.length - max}</span>
+      ) : null}
+    </div>
+  );
+}
 
 /** Live-ticking days:hours:minutes:seconds from an ISO deadline. */
 function useCountdown(endsAt?: string) {
@@ -133,6 +189,23 @@ export function BattlePassPanel({ topicId }: { topicId?: string }) {
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Competitive milestone leaderboard (compact top-N board + own opt-in/rank).
+  const [board, setBoard] = useState<LeaderboardResponse | null>(null);
+  const [mine, setMine] = useState<TopicLeaderboard | null>(null);
+  const [optingIn, setOptingIn] = useState(false);
+
+  const loadBoard = useCallback(async () => {
+    if (!topicId) return;
+    try {
+      const m = await cytapi.topicLeaderboard(topicId);
+      setMine(m);
+      // Only fetch the public board when this topic is on it (privacy default).
+      if (m.opt_in) setBoard(await cytapi.leaderboard({ per_page: 5 }));
+      else setBoard(null);
+    } catch {
+      /* fail soft */
+    }
+  }, [topicId]);
 
   const load = useCallback(async () => {
     if (!topicId) return;
@@ -148,13 +221,34 @@ export function BattlePassPanel({ topicId }: { topicId?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [topicId]);
+    loadBoard();
+  }, [topicId, loadBoard]);
+
+  async function toggleOptIn(next: boolean) {
+    if (!topicId || optingIn) return;
+    setOptingIn(true);
+    try {
+      await cytapi.setLeaderboardOptIn(topicId, next);
+      await loadBoard();
+    } catch {
+      setToast("Couldn't update your leaderboard setting — try again.");
+    } finally {
+      setOptingIn(false);
+    }
+  }
 
   useEffect(() => {
     load();
   }, [load]);
 
   const countdown = useCountdown(status?.season.ends_at);
+
+  // Live "days into the race" since the topic's season started (the timer start).
+  const daysElapsed = useMemo(() => {
+    if (!status?.season.starts_at) return null;
+    const ms = Date.now() - new Date(status.season.starts_at).getTime();
+    return Math.max(0, Math.floor(ms / 86400000));
+  }, [status?.season.starts_at]);
 
   const activeTrack = status?.tracks[track];
   const tierList = tiers?.tracks[track] ?? [];
@@ -325,6 +419,128 @@ export function BattlePassPanel({ topicId }: { topicId?: string }) {
             />
           ))}
         </div>
+      </div>
+
+      {/* Competitive milestone leaderboard — the 29-day business race */}
+      <div className="rounded-xl border border-line bg-panel2 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-2">
+            <Trophy size={16} className="text-brand" />
+            <span className="text-[13px] font-bold text-ink">
+              Milestone race
+            </span>
+            {daysElapsed != null && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-[11px] font-semibold tabular-nums text-mut">
+                <Timer size={11} /> Day {daysElapsed} of {status.season
+                  ? Math.round(
+                      (new Date(status.season.ends_at).getTime() -
+                        new Date(status.season.starts_at).getTime()) /
+                        86400000,
+                    )
+                  : 29}
+              </span>
+            )}
+          </div>
+          <Link
+            href="/leaderboard"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+          >
+            See full leaderboard <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <p className="mt-1 text-[12px] text-dim">
+          Race other founders on how FAST you hit real business milestones —
+          website live, first $1, first $1k, volume — plus your social reach.
+        </p>
+
+        {/* Opt-in toggle (default off for privacy) */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-panel px-3 py-2">
+          <div className="text-[12px] text-mut">
+            {mine?.opt_in ? (
+              <>
+                You&apos;re on the board
+                {mine.rank ? (
+                  <span className="ml-1 font-semibold text-ink">
+                    · rank #{mine.rank}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              "Opt in to compete on the public leaderboard."
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleOptIn(!mine?.opt_in)}
+            disabled={optingIn}
+            className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-[11.5px] font-bold disabled:opacity-60 ${
+              mine?.opt_in
+                ? "border-line bg-panel2 text-mut hover:text-ink"
+                : "cyt-gradient-bg border-transparent text-bg"
+            }`}
+          >
+            {optingIn ? <Loader2 size={11} className="animate-spin" /> : null}
+            {mine?.opt_in ? "Leave board" : "Join the race"}
+          </button>
+        </div>
+
+        {/* Your live reach totals (real signals only) */}
+        {mine && (
+          <div className="mt-2 flex flex-wrap gap-2 text-[11.5px] text-mut">
+            <span className="inline-flex items-center gap-1">
+              <Eye size={12} /> {mine.metrics.views.toLocaleString()} views
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MousePointerClick size={12} /> {mine.metrics.clicks.toLocaleString()}{" "}
+              clicks
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Rocket size={12} /> {mine.metrics.conversions.toLocaleString()}{" "}
+              conversions
+            </span>
+          </div>
+        )}
+
+        {/* Compact top-N board (only when opted in) */}
+        {board && board.entries.length > 0 && (
+          <ol className="mt-3 space-y-1.5">
+            {board.entries.map((e: LeaderboardEntry) => (
+              <li
+                key={e.id}
+                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 ${
+                  e.is_you
+                    ? "border-brand/50 bg-brand/10"
+                    : "border-line bg-panel"
+                }`}
+              >
+                <span
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-bold tabular-nums ${rankChipCls(
+                    e.rank,
+                  )}`}
+                >
+                  {(e.rank ?? 0) <= 3 ? <Medal size={13} /> : e.rank}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 truncate text-[12.5px] font-semibold text-ink">
+                    {e.name}
+                    {e.is_you ? (
+                      <span className="rounded bg-brand/20 px-1 text-[10px] font-bold text-brand">
+                        YOU
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-0.5">
+                    <MilestoneBadges milestones={e.milestones} max={3} />
+                  </div>
+                </div>
+                <span className="shrink-0 text-[11px] text-dim">
+                  {e.business_stage_label}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
 
       {toast && (

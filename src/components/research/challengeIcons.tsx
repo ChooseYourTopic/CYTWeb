@@ -9,6 +9,8 @@ import {
   Lightbulb,
   Megaphone,
   Coins,
+  Globe,
+  Trophy,
   Target,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +28,8 @@ const ICONS: Record<string, LucideIcon> = {
   bulb: Lightbulb,
   megaphone: Megaphone,
   coin: Coins,
+  globe: Globe,
+  trophy: Trophy,
 };
 
 export function iconFor(token?: string): LucideIcon {
