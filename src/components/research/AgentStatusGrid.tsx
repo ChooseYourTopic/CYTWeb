@@ -337,6 +337,18 @@ function AgentDetailView({
                 {profile.model}
               </code>
             )}
+            {profile?.version && (
+              <code
+                className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut"
+                title="Current profile version (role + prompt + skills + loops). Each run is stamped with the version it executed against."
+              >
+                profile {profile.version}
+                {profile.prompt.override_active &&
+                profile.prompt.override_version != null
+                  ? ` · override v${profile.prompt.override_version}`
+                  : ""}
+              </code>
+            )}
             <span>
               Startup ritual ·{" "}
               <code className="rounded bg-panel2 px-1 py-0.5 text-[11px] text-mut">
@@ -559,6 +571,16 @@ function AgentDetailView({
                   {t.duration_secs != null && <span>{t.duration_secs}s</span>}
                   {t.tokens_used != null && <span>{t.tokens_used} tokens</span>}
                   {t.cost_usd != null && <span>${t.cost_usd}</span>}
+                  {t.profile_version && (
+                    <span title="Agent profile version this run executed against">
+                      profile {t.profile_version}
+                    </span>
+                  )}
+                  {t.override_version != null && (
+                    <span title="Realign-override version this run executed against">
+                      override v{t.override_version}
+                    </span>
+                  )}
                 </div>
               )}
 

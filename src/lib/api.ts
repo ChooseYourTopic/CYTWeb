@@ -165,6 +165,10 @@ export type AgentQueueItem = {
   created_at: string | null;
   // Ticket detail from the latest run for this task.
   model?: string | null;
+  // The exact config state this run executed against (per-action audit stamp):
+  // the agent's profile version + the active realign-override version, if any.
+  profile_version?: string | null;
+  override_version?: number | null;
   tokens_used?: number | null;
   cost_usd?: number | null;
   duration_secs?: number | null;
@@ -232,7 +236,14 @@ export type AgentLoop = {
 export type AgentPromptState = {
   summary: string;
   override_active: boolean;
-  override: { id: number; name: string | null; content: string } | null;
+  // Version of the active realign-override in force (null when on the built-in).
+  override_version?: number | null;
+  override: {
+    id: number;
+    name: string | null;
+    version?: number;
+    content: string;
+  } | null;
   extends_count: number;
 };
 
@@ -244,6 +255,9 @@ export type AgentProfile = {
   cadence: string;
   skills: AgentSkill[];
   loops: AgentLoop[];
+  // Short content hash of the profile (role+prompt+skills+loops) — the value each
+  // agent_run stamps as its profile_version.
+  version?: string;
   prompt: AgentPromptState;
 };
 
