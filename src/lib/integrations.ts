@@ -180,4 +180,19 @@ export const INTEGRATIONS: IntegrationDef[] = [
     affiliateUrl: "https://slack.com/get-started",
     docsUrl: "https://api.slack.com/apps",
   },
+  {
+    key: "voices",
+    name: "Voices (TTS)",
+    category: "Voice",
+    desc: "Speak your agents' cheeky challenge lines + narration in a voice you pick.",
+    color: "#EC4899",
+    initial: "V",
+    fields: [
+      { key: "endpoint", label: "TTS endpoint URL", placeholder: "http://127.0.0.1:8880" },
+      { key: "api_key", label: "API key (optional for a local server)", placeholder: "…" },
+      { key: "voice_id", label: "Default voice id", placeholder: "bm_lewis" },
+    ],
+    affiliateUrl: "https://github.com/remsky/Kokoro-FastAPI",
+    docsUrl: "https://github.com/remsky/Kokoro-FastAPI",
+  },
 ];

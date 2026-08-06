@@ -248,7 +248,10 @@ export type SectionKey =
   | "build"
   | "automations"
   | "network"
-  | "security";
+  | "security"
+  // Media — the topic's generated creative output (images, clips, posts, ads).
+  // Placeholder/scaffold for now; no backend section fetch yet.
+  | "media";
 
 // Sections fetched via GET /topic/{id}/{section} → SectionItem[].
 // (overview uses /overview, report uses /reports, decisions uses /tasks.)

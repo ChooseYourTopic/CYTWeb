@@ -24,6 +24,8 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "automations", label: "Automations" },
   { key: "network", label: "Network" },
   { key: "security", label: "Security" },
+  // Media is intentionally LAST — the bottom-right tab after Integrations et al.
+  { key: "media", label: "Media" },
 ];
 
 /**
@@ -44,6 +46,8 @@ export const CORE_SECTIONS: SectionKey[] = [
   "automations",
   "network",
   "security",
+  // Media shows in Standard + Expert (kept last so it sits bottom-right).
+  "media",
 ];
 
 /**

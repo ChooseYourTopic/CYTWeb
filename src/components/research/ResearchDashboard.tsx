@@ -27,6 +27,7 @@ import { OutreachPanel } from "@/components/research/OutreachPanel";
 import { SupportPanel } from "@/components/research/SupportPanel";
 import { AdsPanel } from "@/components/research/AdsPanel";
 import { BuildPanel } from "@/components/research/BuildPanel";
+import { MediaPanel } from "@/components/research/MediaPanel";
 import { InvestigationRail } from "@/components/research/InvestigationRail";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFinanceSummary } from "@/hooks/useFinanceSummary";
@@ -406,6 +407,7 @@ export function ResearchDashboard({
             {active === "finance" && <FinancePanel topicId={topicId} />}
             {active === "decisions" && <DecisionsPanel />}
             {active === "report" && <ReportArtifact />}
+            {active === "media" && <MediaPanel />}
           </div>
         </Card>
 
