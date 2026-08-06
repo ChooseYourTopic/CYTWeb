@@ -23,7 +23,6 @@ import {
   Send,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
-import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import {
   cytapi,
   ApiError,
@@ -240,6 +239,8 @@ function GoalGuideModal({
   const [copied, setCopied] = useState<number | null>(null);
   const [runningPrompt, setRunningPrompt] = useState<number | null>(null);
   const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [takeInput, setTakeInput] = useState("");
+  const [taking, setTaking] = useState(false);
 
   async function copyPrompt(text: string, i: number) {
     try {
@@ -276,6 +277,21 @@ function GoalGuideModal({
     }
   }
 
+  async function takeOn() {
+    if (!topicId || !primaryAgent || !takeInput.trim() || taking) return;
+    setTaking(true);
+    setRunMsg(null);
+    try {
+      const r = await cytapi.agentTrigger(primaryAgent, topicId, takeInput.trim());
+      setRunMsg(r.message ?? `Sent to ${prettyAgent(primaryAgent)} — making progress.`);
+      setTakeInput("");
+    } catch {
+      setRunMsg("Couldn't send that — try again.");
+    } finally {
+      setTaking(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -298,8 +314,42 @@ function GoalGuideModal({
           </button>
         </div>
         <p className="mt-1 text-[12.5px] text-mut">
-          How to get this done with your agent team.
+          Take on this challenge — give your team context or a direction to make
+          progress, or run an action below.
         </p>
+
+        <div className="mt-4 rounded-xl border border-line bg-panel2 p-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+            <Send size={14} className="text-brand" /> Take it on
+          </div>
+          <p className="mb-2 text-[12px] text-mut">
+            Add context, a direction, or an action and send it to{" "}
+            {primaryAgent ? prettyAgent(primaryAgent) : "your team"} to move this
+            forward.
+          </p>
+          <textarea
+            value={takeInput}
+            onChange={(e) => setTakeInput(e.target.value)}
+            rows={3}
+            placeholder="e.g. focus on the budget-conscious buyer, or: draft 3 launch posts…"
+            className="cyt-input w-full resize-y text-[13px]"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={takeOn}
+              disabled={!topicId || !primaryAgent || !takeInput.trim() || taking}
+              className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-bold text-bg disabled:opacity-50"
+            >
+              {taking ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              Take it on
+            </button>
+          </div>
+        </div>
 
         {guide?.agents?.length ? (
           <div className="mt-4">
@@ -751,64 +801,43 @@ export function LivingReport({
           return (
             <div key={cadence} className="mb-3 last:mb-0">
               <div className="mb-1.5 text-[11px] uppercase tracking-wide text-dim">
-                {cadence}
+                {cadence} challenge
               </div>
               {list.length > 0 ? (
                 <ul className="space-y-1.5">
-                  {list.map((g) => {
-                    const CIcon = iconFor(g.icon);
-                    const frame = frameFor(g.difficulty);
-                    return (
-                      <li
-                        key={g.id}
-                        className={`flex items-start gap-2.5 rounded-lg border ${frame.border} bg-panel2 px-2.5 py-2`}
+                  {list.map((g, i) => (
+                    <li
+                      key={g.id}
+                      className="flex items-center gap-2.5 rounded-lg border border-line bg-panel2 px-2.5 py-2"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleGoal(cadence, g.id)}
+                        aria-label={g.done ? "Mark not done" : "Mark done"}
+                        className="shrink-0"
                       >
-                        <button
-                          type="button"
-                          onClick={() => toggleGoal(cadence, g.id)}
-                          aria-label={g.done ? "Mark not done" : "Mark done"}
-                          className="mt-0.5 shrink-0"
+                        {g.done ? (
+                          <CheckSquare size={16} className="text-good" />
+                        ) : (
+                          <Square size={16} className="text-mut" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveGoal({ cadence, goal: g })}
+                        className="group flex flex-1 items-center justify-between gap-2 text-left"
+                      >
+                        <span
+                          className={`text-[13.5px] font-medium ${g.done ? "text-dim line-through" : "text-ink/90"}`}
                         >
-                          {g.done ? (
-                            <CheckSquare size={16} className="text-good" />
-                          ) : (
-                            <Square size={16} className="text-mut" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveGoal({ cadence, goal: g })}
-                          className="group flex flex-1 flex-col items-start gap-1 text-left"
-                        >
-                          <div className="flex w-full items-start gap-2">
-                            <CIcon
-                              size={15}
-                              className={`mt-0.5 shrink-0 ${frame.text}`}
-                            />
-                            <span
-                              title={g.title}
-                              className={`flex-1 text-[13.5px] ${g.done ? "text-dim line-through" : "text-ink/90"}`}
-                            >
-                              {g.voice_line || g.title}
-                            </span>
-                            <span className="mt-0.5 shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
-                              How to →
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 pl-[23px]">
-                            <span
-                              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${frame.chip}`}
-                            >
-                              {frame.label}
-                            </span>
-                            <span className="rounded-full border border-brand/40 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">
-                              +{g.points ?? 0} XP
-                            </span>
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
+                          Challenge {i + 1}
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
+                          View →
+                        </span>
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               ) : (
                 <p className="text-[13px] text-dim">
