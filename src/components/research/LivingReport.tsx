@@ -23,6 +23,7 @@ import {
   Send,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
+import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import {
   cytapi,
   ApiError,
@@ -476,6 +477,8 @@ export function LivingReport({
     cadence: keyof TopicGoals;
     goal: TopicGoal;
   } | null>(null);
+  // Transient XP celebration toast fired off a challenge toggle's battle-pass delta.
+  const [xpToast, setXpToast] = useState<string | null>(null);
   useEffect(() => {
     if (!topicId) return;
     let cancelled = false;
@@ -503,7 +506,20 @@ export function LivingReport({
     if (!topicId) return;
     setGoalGroups((prev) => (prev ? flip(prev, cadence, goalId) : prev)); // optimistic
     try {
-      await cytapi.toggleTopicGoal(topicId, goalId);
+      const r = await cytapi.toggleTopicGoal(topicId, goalId);
+      const delta = r.battlepass?.xp_delta ?? 0;
+      if (delta > 0) {
+        setXpToast(
+          r.battlepass.season_finished
+            ? `+${delta} XP · Season cleared! 👑`
+            : r.battlepass.tier_up
+              ? `+${delta} XP · Tier up! 🎉`
+              : `+${delta} XP 🔥`,
+        );
+      } else if (delta < 0) {
+        setXpToast(`${delta} XP`);
+      }
+      if (delta !== 0) window.setTimeout(() => setXpToast(null), 2500);
     } catch {
       setGoalGroups((prev) => (prev ? flip(prev, cadence, goalId) : prev)); // revert
     }
@@ -722,12 +738,13 @@ export function LivingReport({
       )}
 
       <CollapsibleSection
-        title="Goals"
+        title="Challenges"
         open={isOpen("goals")}
         onToggle={() => toggle("goals")}
       >
         <p className="mb-3 text-[12.5px] text-mut">
-          Small steps to keep {projectName} moving — check them off as you go.
+          Clear challenges to keep {projectName} moving and earn XP toward your
+          Battle Pass — check them off as you go.
         </p>
         {(["daily", "weekly", "monthly"] as const).map((cadence) => {
           const list = goalGroups?.[cadence] ?? [];
@@ -737,41 +754,65 @@ export function LivingReport({
                 {cadence}
               </div>
               {list.length > 0 ? (
-                <ul className="space-y-1">
-                  {list.map((g) => (
-                    <li key={g.id} className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleGoal(cadence, g.id)}
-                        aria-label={g.done ? "Mark not done" : "Mark done"}
-                        className="mt-1 shrink-0"
+                <ul className="space-y-1.5">
+                  {list.map((g) => {
+                    const CIcon = iconFor(g.icon);
+                    const frame = frameFor(g.difficulty);
+                    return (
+                      <li
+                        key={g.id}
+                        className={`flex items-start gap-2.5 rounded-lg border ${frame.border} bg-panel2 px-2.5 py-2`}
                       >
-                        {g.done ? (
-                          <CheckSquare size={16} className="text-good" />
-                        ) : (
-                          <Square size={16} className="text-mut" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveGoal({ cadence, goal: g })}
-                        className="group flex flex-1 items-start justify-between gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-panel"
-                      >
-                        <span
-                          className={`text-[14px] ${g.done ? "text-dim line-through" : "text-ink/90"}`}
+                        <button
+                          type="button"
+                          onClick={() => toggleGoal(cadence, g.id)}
+                          aria-label={g.done ? "Mark not done" : "Mark done"}
+                          className="mt-0.5 shrink-0"
                         >
-                          {g.title}
-                        </span>
-                        <span className="mt-0.5 shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
-                          How to →
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                          {g.done ? (
+                            <CheckSquare size={16} className="text-good" />
+                          ) : (
+                            <Square size={16} className="text-mut" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveGoal({ cadence, goal: g })}
+                          className="group flex flex-1 flex-col items-start gap-1 text-left"
+                        >
+                          <div className="flex w-full items-start gap-2">
+                            <CIcon
+                              size={15}
+                              className={`mt-0.5 shrink-0 ${frame.text}`}
+                            />
+                            <span
+                              title={g.title}
+                              className={`flex-1 text-[13.5px] ${g.done ? "text-dim line-through" : "text-ink/90"}`}
+                            >
+                              {g.voice_line || g.title}
+                            </span>
+                            <span className="mt-0.5 shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
+                              How to →
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 pl-[23px]">
+                            <span
+                              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${frame.chip}`}
+                            >
+                              {frame.label}
+                            </span>
+                            <span className="rounded-full border border-brand/40 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">
+                              +{g.points ?? 0} XP
+                            </span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="text-[13px] text-dim">
-                  {goalGroups ? "No steps this period." : "Loading…"}
+                  {goalGroups ? "No challenges this period." : "Loading…"}
                 </p>
               )}
             </div>
@@ -789,6 +830,12 @@ export function LivingReport({
           done={done}
           error={error}
         />
+      )}
+
+      {xpToast && (
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-rise rounded-full border border-brand/50 bg-brand/15 px-5 py-2.5 text-[14px] font-bold text-brand shadow-xl">
+          {xpToast}
+        </div>
       )}
 
       {activeGoal && (

@@ -230,6 +230,7 @@ export type FinanceSummary = {
 
 export type SectionKey =
   | "overview"
+  | "battlepass"
   | "context"
   | "integrations"
   | "models"
@@ -325,17 +326,127 @@ export type GoalGuide = {
   loops: string[];
 };
 
-/** One interactive momentum step for a topic. */
+/** One interactive momentum step for a topic (a.k.a. a gamification challenge). */
 export type TopicGoal = {
   id: number;
   title: string;
   done: boolean;
   guide?: GoalGuide;
+  // Challenge overlay (gamification): icon token + cheeky voice line + XP weight.
+  icon?: string;
+  voice_line?: string;
+  difficulty?: ChallengeDifficulty;
+  points?: number;
+  challenge_key?: string;
 };
 export type TopicGoals = {
   daily: TopicGoal[];
   weekly: TopicGoal[];
   monthly: TopicGoal[];
+};
+
+/* ------------------------------ Battle pass -------------------------------- */
+
+export type ChallengeDifficulty = "trivial" | "standard" | "hard" | "boss";
+export type BattlePassTrackKey = "weekly" | "monthly";
+export type PaceBadge = "ahead" | "on_pace" | "behind";
+
+export type BattlePassSeason = {
+  id: number;
+  name: string | null;
+  status: "active" | "finished" | "expired" | string;
+  starts_at: string;
+  ends_at: string;
+  target_xp: number;
+  days_to_finish: number | null;
+};
+
+export type BattlePassTrack = {
+  track: BattlePassTrackKey;
+  xp: number;
+  tier: number;
+  max_tier: number;
+  tier_floor_xp: number;
+  next_tier_xp: number | null;
+  claimed_tiers: number[];
+};
+
+export type BattlePassPace = {
+  badge: PaceBadge;
+  xp: number;
+  par_xp: number;
+  target_xp: number;
+  elapsed_days: number;
+  season_days: number;
+  projected_finish_day: number | null;
+};
+
+export type BattlePassCountdown = {
+  ends_at: string;
+  seconds_left: number;
+  days_left: number;
+  hours_left: number;
+  urgent: boolean;
+};
+
+export type BattlePassStreak = {
+  days: number;
+  longest: number;
+  last_activity_date: string | null;
+};
+
+export type BattlePassStatus = {
+  season: BattlePassSeason;
+  tracks: { weekly: BattlePassTrack; monthly: BattlePassTrack };
+  pace: BattlePassPace;
+  countdown: BattlePassCountdown;
+  streak: BattlePassStreak;
+};
+
+export type Reward = {
+  class: "cosmetic" | "unlock" | "credits";
+  label: string;
+  icon: string;
+  credits_cents?: number;
+  unlock?: string;
+  amount?: number;
+  cosmetic?: string;
+};
+
+/** One rung on a battle-pass track's tier ladder. */
+export type BattlePassTier = {
+  tier: number;
+  threshold_xp: number;
+  reward: Reward;
+  unlocked: boolean;
+  claimed: boolean;
+};
+
+export type BattlePassTiers = {
+  season_id: number;
+  tracks: { weekly: BattlePassTier[]; monthly: BattlePassTier[] };
+};
+
+export type ClaimResult = {
+  claimed: boolean;
+  already_claimed?: boolean;
+  track: BattlePassTrackKey;
+  tier: number;
+  reward: Reward;
+  granted?: { type: string; [k: string]: unknown };
+  balance_cents: number;
+};
+
+/** The celebration payload returned by a goal toggle (XP delta + any tier-up). */
+export type ChallengeEffect = {
+  xp_delta: number;
+  changed: boolean;
+  tier_up: boolean;
+  season_finished: boolean;
+  weekly_tier: number;
+  monthly_tier: number;
+  monthly_xp: number;
+  season_id: number;
 };
 
 /* ------------------------- Signed-in user (me) ---------------------------- */
@@ -954,9 +1065,20 @@ export const cytapi = {
   topicGoals: (id: string | number) =>
     client.get<{ goals: TopicGoals }>(`/me/topics/${id}/goals`),
   toggleTopicGoal: (id: string | number, goalId: number) =>
-    client.post<{ id: number; done: boolean }>(
+    client.post<{ id: number; done: boolean; battlepass: ChallengeEffect }>(
       `/me/topics/${id}/goals/${goalId}/toggle`,
     ),
+
+  // Battle pass — per-topic 29-day season status, tier ladder, and tier claims.
+  battlePass: (id: string | number) =>
+    client.get<BattlePassStatus>(`/me/topics/${id}/battlepass`),
+  battlePassTiers: (id: string | number) =>
+    client.get<BattlePassTiers>(`/me/topics/${id}/battlepass/tiers`),
+  claimTier: (id: string | number, track: BattlePassTrackKey, tier: number) =>
+    client.post<ClaimResult>(`/me/topics/${id}/battlepass/claim`, {
+      track,
+      tier,
+    }),
 
   // Per-topic integrations — connect a service with a token / secret key. The
   // secret is stored encrypted server-side and never returned (status only).

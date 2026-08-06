@@ -9,6 +9,7 @@ import {
   BASIC_SECTIONS,
 } from "@/components/research/SectionTabs";
 import { LivingReport } from "@/components/research/LivingReport";
+import { BattlePassPanel } from "@/components/research/BattlePassPanel";
 import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
@@ -385,6 +386,7 @@ export function ResearchDashboard({
                 topicId={topicId}
               />
             )}
+            {active === "battlepass" && <BattlePassPanel topicId={topicId} />}
             {active === "context" && <ContextPanel topicId={topicId} />}
             {active === "integrations" && (
               <IntegrationsPanel topicId={topicId} />
