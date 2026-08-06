@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useResearchStore } from "@/store/useResearchStore";
-import type { SectionKey } from "@/lib/api";
+import { ApiError, type SectionKey } from "@/lib/api";
 
 type Loader<T> = () => Promise<T>;
 
@@ -21,6 +21,10 @@ export function useSectionData<T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The HTTP status of the last failed load (null when none / not an ApiError),
+  // so callers can react to auth outcomes — e.g. a 403/404 on a topic fetch means
+  // "not on your account" and the page redirects rather than polling a skeleton.
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const cancelled = useRef(false);
 
   const newCount = useResearchStore((s) => s.newCounts[section] ?? 0);
@@ -31,9 +35,13 @@ export function useSectionData<T>(
       if (!cancelled.current) {
         setData(result);
         setError(null);
+        setErrorStatus(null);
       }
     } catch (e) {
-      if (!cancelled.current) setError(String(e));
+      if (!cancelled.current) {
+        setError(String(e));
+        setErrorStatus(e instanceof ApiError ? e.status : null);
+      }
     } finally {
       if (!cancelled.current) setLoading(false);
     }
@@ -64,5 +72,5 @@ export function useSectionData<T>(
     if (enabled && newCount > 0) load();
   }, [newCount, load, enabled]);
 
-  return { data, loading, error, refetch: load };
+  return { data, loading, error, errorStatus, refetch: load };
 }

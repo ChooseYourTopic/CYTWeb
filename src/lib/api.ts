@@ -374,6 +374,11 @@ export type TopicActivity = {
 
 export type TopicOverview = {
   topic: string;
+  // Identity the page displays + matches: which account owns this topic and the
+  // owner's license snapshot. The server-side ownership + license WALL is the
+  // real gate; these are for display/identity-match only, never the access check.
+  user_id?: number;
+  license?: License;
   tagline?: string;
   cycle_day?: number;
   cycle_phase?: string;
@@ -1333,6 +1338,8 @@ export const cytapi = {
     );
     return {
       topic: raw?.company?.topic ?? "",
+      user_id: raw?.user_id,
+      license: raw?.license,
       tagline: raw?.company?.value_prop,
       exec_summary: plan.summary ?? raw?.company?.mission,
       cycle_day: raw?.cycle_day,

@@ -179,6 +179,19 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Notice shown after being bounced off a topic that isn't on this account
+  // (server-side ownership/license wall → redirect here). Read client-side from
+  // the query string to avoid the useSearchParams/Suspense build constraint.
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notice") === "not-your-topic") {
+      setNotice("That topic isn't on your account — here are your topics.");
+      // Clean the URL so a refresh doesn't re-show the banner.
+      window.history.replaceState(null, "", "/dashboard");
+    }
+  }, []);
 
   /** Pause/resume a project against the server, with an optimistic flip. */
   const togglePause = useCallback(
@@ -272,6 +285,20 @@ export default function DashboardPage() {
   return (
     <main className="mx-auto max-w-[1180px] px-6 pb-24">
       <SiteHeader />
+
+      {notice && (
+        <div className="mx-auto mt-6 flex max-w-[860px] items-start justify-between gap-3 rounded-xl border border-[#4a3b1a] bg-[#1c1708] px-4 py-3 text-[13px] text-warn">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 text-mut transition-colors hover:text-ink"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <section className="mx-auto mt-12 max-w-[860px]">
         <div className="flex items-end justify-between gap-4">

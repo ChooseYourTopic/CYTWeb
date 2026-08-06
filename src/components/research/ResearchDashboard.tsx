@@ -37,6 +37,7 @@ import { useResearchStore } from "@/store/useResearchStore";
 import { cytapi, type TopicOverview, type ViewMode } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Pause, Play, Loader2 } from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
@@ -172,12 +173,25 @@ export function ResearchDashboard({
   const [pauseBusy, setPauseBusy] = useState(false);
   const paused = pausedState ?? false;
 
-  const { data: overview, loading, refetch } = useSectionData<TopicOverview>(
-    "overview",
-    () => cytapi.topicOverview(topicId),
-    20000,
-    !paused,
-  );
+  const router = useRouter();
+
+  const { data: overview, loading, refetch, errorStatus } =
+    useSectionData<TopicOverview>(
+      "overview",
+      () => cytapi.topicOverview(topicId),
+      20000,
+      !paused,
+    );
+
+  // Ownership/license wall (server-enforced): a topic that isn't on this account
+  // returns 404 (existence-hiding for a cross-account id) or 403 (owned but the
+  // license is inactive). Either way it isn't theirs to view — send them back to
+  // their own dashboard with a clear notice instead of polling a dead skeleton.
+  useEffect(() => {
+    if (errorStatus === 403 || errorStatus === 404) {
+      router.replace("/dashboard?notice=not-your-topic");
+    }
+  }, [errorStatus, router]);
 
   // Seed the paused state from the server once the overview first loads.
   useEffect(() => {
@@ -320,6 +334,20 @@ export function ResearchDashboard({
             <RunModeBadge mode={overview?.run_mode} source={overview?.run_source} />
           </h2>
           <div className="text-[14px] text-mut">{tagline}</div>
+          {overview?.license && (
+            <div
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2 py-0.5 text-[11px] text-mut"
+              title="This topic is on your account — verified server-side by ownership + license."
+            >
+              <span>{overview.license.label ?? overview.license.type}</span>
+              {overview.license.id && (
+                <span className="font-mono text-dim"> · {overview.license.id}</span>
+              )}
+              {overview.license.status !== "active" && (
+                <span className="text-warn"> · {overview.license.status}</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="rounded-card border border-line bg-panel px-4 py-3 text-right">
           <div className="text-[12px] uppercase tracking-wide text-mut">
