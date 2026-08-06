@@ -372,6 +372,8 @@ export function ResearchDashboard({
         finance={finance}
         findings={Number(findings)}
         activeAgents={activeAgents}
+        agentStatuses={agentStatuses}
+        topicId={topicId}
         loading={loading}
       />
 

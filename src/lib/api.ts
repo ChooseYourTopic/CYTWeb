@@ -310,6 +310,59 @@ export type TopicOverview = {
   items?: SectionItem[];
 };
 
+/* --------------------- KPI-tile drill-down (modal) types ------------------- */
+
+/** A task counted by the "Tasks today" tile. */
+export type KpiTaskItem = {
+  id: number;
+  title: string;
+  agent_type: string;
+  status: string;
+  priority: number;
+  created_at: string | null;
+};
+export type KpiTasksToday = { total: number; items: KpiTaskItem[] };
+
+/** A single research finding behind the "Findings" tile (competitor or draft). */
+export type KpiFindingItem = {
+  id: string;
+  kind: "competitor" | "post";
+  title: string;
+  summary?: string;
+  status?: string;
+  agent_type?: string;
+  created_at?: string | null;
+};
+export type KpiFindings = {
+  total: number;
+  counts: { competitors: number; posts: number };
+  items: KpiFindingItem[];
+};
+
+/** One model run contributing to the spend tile. */
+export type KpiSpendRun = {
+  id: number;
+  agent_type: string;
+  run_type: string;
+  status: string;
+  model: string | null;
+  tokens_used: number | null;
+  cost_usd: number;
+  duration_secs: number | null;
+  started_at: string | null;
+};
+export type KpiSpendByAgent = {
+  agent_type: string;
+  cost_usd: number;
+  runs: number;
+  tokens_used: number;
+};
+export type KpiSpend = {
+  total_usd: number;
+  by_agent: KpiSpendByAgent[];
+  items: KpiSpendRun[];
+};
+
 export type DailyReport = {
   id: number | string;
   date: string;
@@ -989,6 +1042,19 @@ export const cytapi = {
       section,
       await request(`/topic/${id}/${section}`, { headers: sigHeaders(id) }),
     ),
+
+  // KPI-tile drill-downs — the underlying items behind a dashboard stat tile,
+  // company-scoped + signature-validated like the other topic surfaces.
+  kpiTasksToday: (id: string): Promise<KpiTasksToday> =>
+    request<KpiTasksToday>(`/topic/${id}/kpi/tasks-today`, {
+      headers: sigHeaders(id),
+    }),
+  kpiFindings: (id: string): Promise<KpiFindings> =>
+    request<KpiFindings>(`/topic/${id}/kpi/findings`, {
+      headers: sigHeaders(id),
+    }),
+  kpiSpend: (id: string): Promise<KpiSpend> =>
+    request<KpiSpend>(`/topic/${id}/kpi/spend`, { headers: sigHeaders(id) }),
 
   // Daily report artifacts.
   reports: (limit = 20) => client.get<DailyReport[]>(`/reports?limit=${limit}`),
