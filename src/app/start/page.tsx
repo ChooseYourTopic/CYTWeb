@@ -14,6 +14,11 @@ import {
   ClipboardList,
   Rocket,
   CircleDollarSign,
+  Mic,
+  MicOff,
+  Shuffle,
+  PencilLine,
+  Dices,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -24,9 +29,20 @@ import {
   type SocialPlatform,
 } from "@/lib/api";
 import { FOCUS_IDEAS, WILDCARD_TOPICS } from "@/lib/topicIdeas";
+import { useSpeechInput } from "@/hooks/useSpeechInput";
 
 type Clarity = "know" | "idea";
 type YesNo = "yes" | "no";
+// How the owner supplies their topic on step 2: they know it (type/dictate) or
+// they want the platform to pick a curated one for them.
+type TopicMode = "know" | "random";
+
+/** Pick a random curated idea appropriate to the selected focus (reuses /choose). */
+function rollRandomTopic(focus: string): string {
+  const ideas = FOCUS_IDEAS[focus]?.ideas ?? [];
+  if (ideas.length === 0) return "";
+  return ideas[Math.floor(Math.random() * ideas.length)];
+}
 
 const PLATFORMS: { key: SocialPlatform; label: string }[] = [
   { key: "youtube", label: "YouTube" },
@@ -83,6 +99,32 @@ export default function StartPage() {
   const [error, setError] = useState<string | null>(null);
   // Independent focus selector on step 2 — a user can pick any of these anytime.
   const [stage, setStage] = useState<string>("invent");
+  // Path on step 2: "know" = type/dictate your topic; "random" = we pick one.
+  const [topicMode, setTopicMode] = useState<TopicMode>("know");
+
+  // Browser dictation for the topic field (shared hook — same STT the Cue Winslow
+  // widget uses). Feature-detected; the mic hides where unsupported.
+  const {
+    supported: micSupported,
+    listening,
+    interim,
+    toggle: toggleMic,
+    stop: stopMic,
+  } = useSpeechInput({
+    continuous: false,
+    onFinal: (chunk) =>
+      setTopic((prev) => (prev ? `${prev.trim()} ${chunk}` : chunk)),
+  });
+
+  // Selecting "Random" (or shuffling) has the platform pick a focus-appropriate
+  // topic and fills the field so the user can review, tweak, then Start.
+  function pickRandom() {
+    stopMic();
+    setTopicMode("random");
+    setError(null);
+    const idea = rollRandomTopic(stage);
+    if (idea) setTopic(idea);
+  }
 
   const step1Ready = Boolean(ai && biz && clarity && hasWebsite && usesSocial);
 
@@ -102,9 +144,19 @@ export default function StartPage() {
     setStep(2);
   }
 
-  async function start(override?: string) {
+  async function start(
+    override?: string,
+    meta?: { focus?: string; mode?: TopicMode },
+  ) {
     const t = (override ?? topic).trim();
     if (!t || busy) return;
+    // The chosen focus + mode travel with the Start action (filters for how the
+    // topic was chosen); the topic route consumes the created id.
+    const focus = meta?.focus ?? stage;
+    const mode = meta?.mode ?? topicMode;
+    void focus;
+    void mode;
+    stopMic();
     setBusy(true);
     setError(null);
     try {
@@ -288,7 +340,12 @@ export default function StartPage() {
                     key={s.key}
                     type="button"
                     aria-pressed={active}
-                    onClick={() => setStage(s.key)}
+                    onClick={() => {
+                      setStage(s.key);
+                      // Re-roll the pick so it stays appropriate to the new focus.
+                      if (topicMode === "random")
+                        setTopic(rollRandomTopic(s.key));
+                    }}
                     className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                       active
                         ? "cyt-gradient-bg border-transparent text-bg"
@@ -305,20 +362,86 @@ export default function StartPage() {
                 );
               })}
             </div>
+            {/* Two paths once a focus is chosen: know it, or let us pick one. */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={topicMode === "know"}
+                onClick={() => {
+                  setTopicMode("know");
+                  setError(null);
+                }}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  topicMode === "know"
+                    ? "border-[#31384c] bg-panel2 text-ink"
+                    : "border-line text-mut hover:text-ink"
+                }`}
+              >
+                <PencilLine size={15} className="shrink-0 text-brand" />
+                <span className="text-[13px] font-semibold">
+                  I know what I want
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={topicMode === "random"}
+                onClick={pickRandom}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  topicMode === "random"
+                    ? "border-[#31384c] bg-panel2 text-ink"
+                    : "border-line text-mut hover:text-ink"
+                }`}
+              >
+                <Dices size={15} className="shrink-0 text-brand" />
+                <span className="text-[13px] font-semibold">Random</span>
+              </button>
+            </div>
+
             <p className="text-[14px] text-mut">
-              Type your topic, or pick one of the ideas below.
+              {topicMode === "random"
+                ? "We picked one for your focus — tweak it, shuffle, or hit Start."
+                : "Type or dictate your topic, or pick one of the ideas below."}
             </p>
 
             <div className="flex gap-2">
-              <input
-                className="cyt-input"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. a subscription box for rare houseplants"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") start();
-                }}
-              />
+              <div className="cyt-input flex flex-1 items-center gap-2 p-0 pr-2">
+                <input
+                  className="min-w-0 flex-1 bg-transparent px-3.5 py-3 text-[14px] text-ink outline-none placeholder:text-dim"
+                  value={listening && interim ? `${topic ? `${topic} ` : ""}${interim}` : topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="e.g. a subscription box for rare houseplants"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") start();
+                  }}
+                />
+                {topicMode === "random" && (
+                  <button
+                    type="button"
+                    onClick={() => setTopic(rollRandomTopic(stage))}
+                    aria-label="Shuffle a new topic"
+                    title="Shuffle a new topic"
+                    className="shrink-0 rounded-lg p-1.5 text-mut transition-colors hover:text-ink"
+                  >
+                    <Shuffle size={16} />
+                  </button>
+                )}
+                {micSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleMic}
+                    aria-pressed={listening}
+                    aria-label={listening ? "Stop dictation" : "Dictate your topic"}
+                    title={listening ? "Stop dictation" : "Dictate your topic"}
+                    className={`shrink-0 rounded-lg p-1.5 transition-colors ${
+                      listening
+                        ? "text-bad"
+                        : "text-mut hover:text-ink"
+                    }`}
+                  >
+                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => start()}
                 disabled={busy || !topic.trim()}
@@ -332,6 +455,9 @@ export default function StartPage() {
                 Start
               </button>
             </div>
+            {listening && (
+              <p className="text-[12px] text-bad">Listening… speak your topic.</p>
+            )}
             {error && <p className="text-[13px] text-bad">{error}</p>}
 
             {/* Categories + suggestions to help them get started. */}

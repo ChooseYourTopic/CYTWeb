@@ -22,7 +22,7 @@ import {
   Check,
   Send,
 } from "lucide-react";
-import { Sparkline } from "@/components/research/Sparkline";
+import { CueWinslow } from "@/components/research/CueWinslow";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 import {
   cytapi,
@@ -496,7 +496,6 @@ export function LivingReport({
   const items = overview?.items ?? [];
   const valueProp = items.find((i) => i.id === "value-prop");
   const plan = items.find((i) => i.id === "plan");
-  const execSummary = overview?.exec_summary;
   const projectName = overview?.topic || "your project";
   const nextSteps = overview?.recommended_next_steps ?? [];
   const achievements = overview?.recent_achievements ?? [];
@@ -701,29 +700,11 @@ export function LivingReport({
       </div>
 
       <CollapsibleSection
-        title="What the team decided"
+        title="Cue Winslow"
         open={isOpen("decided")}
         onToggle={() => toggle("decided")}
       >
-        {execSummary ? (
-          <>
-            <p className="text-[14px] leading-relaxed text-ink/90">
-              {execSummary}
-            </p>
-            {overview?.spark && overview.spark.length > 0 && (
-              <div className="mt-3.5">
-                <div className="mb-2 text-[12px] uppercase tracking-wide text-mut">
-                  Momentum
-                </div>
-                <Sparkline data={overview.spark} />
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-[13px] text-dim">
-            Writing your report… agents are researching.
-          </p>
-        )}
+        <CueWinslow topicId={topicId} />
       </CollapsibleSection>
 
       <CollapsibleSection

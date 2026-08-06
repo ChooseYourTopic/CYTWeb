@@ -691,6 +691,22 @@ export type MyTopicsResponse = {
   topics: MyTopic[];
 };
 
+/**
+ * Response to a push-to-talk / typed cue: Winslow's triage ticket, plus the
+ * specialist task he routed it to (present once the triage has run — e.g. in the
+ * mock/sync path; null while the triage is still queued).
+ */
+export type CueResult = {
+  message: string;
+  triage_task: { id: number; agent_type: string; status: string };
+  routed_task: {
+    id: number;
+    agent_type: string;
+    title: string;
+    status: string;
+  } | null;
+};
+
 // XTKRecall MCP paid add-on — a managed, hosted knowledge/memory vault reachable
 // over MCP. Per-user grain (serves all the owner's topics). Secrets are never
 // returned; the provisioned key is exposed only masked, and only while entitled.
@@ -1204,6 +1220,11 @@ export const cytapi = {
     client.get<{ context: TopicContext }>(`/me/topics/${id}/context`),
   saveTopicContext: (id: string | number, patch: TopicContext) =>
     client.put<{ context: TopicContext }>(`/me/topics/${id}/context`, patch),
+  // Push-to-talk / typed cue → Winslow triages it and routes it to the right
+  // specialist agent's queue (owner-scoped). Returns his triage ticket + the
+  // routed task (once the triage has run).
+  cueWinslow: (id: string | number, text: string) =>
+    client.post<CueResult>(`/me/topics/${id}/cue`, { text }),
   // Set the project's daily spend cap (from the Overview effort presets).
   setTopicSpendCap: (id: string | number, amount: number | null) =>
     client.put<{ spend_cap_usd: number | null }>(`/me/topics/${id}/spend-cap`, {
