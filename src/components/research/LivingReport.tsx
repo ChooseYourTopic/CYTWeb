@@ -23,6 +23,7 @@ import {
   Send,
 } from "lucide-react";
 import { Sparkline } from "@/components/research/Sparkline";
+import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 import {
   cytapi,
   ApiError,
@@ -214,8 +215,9 @@ function ActivateTaskModal({
   );
 }
 
-/** "social_media" -> "Social Media" for display. */
+/** "social_media" -> "Social Media" for display (orchestrator -> "Winslow"). */
 function prettyAgent(name: string): string {
+  if (AGENT_DISPLAY_NAMES[name]) return AGENT_DISPLAY_NAMES[name];
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -583,14 +585,14 @@ export function LivingReport({
       await cytapi.agentTrigger("orchestrator", topicId);
       setAccelMsg(
         intent === "plan"
-          ? "Orchestrator invoked — re-planning the project."
+          ? "Winslow invoked — re-planning the project."
           : intent === "review"
-            ? "Orchestrator invoked — reviewing progress."
-            : "Orchestrator invoked — accelerating now.",
+            ? "Winslow invoked — reviewing progress."
+            : "Winslow invoked — accelerating now.",
       );
       setAccelOpen(false);
     } catch {
-      setAccelMsg("Couldn't invoke the orchestrator. Please try again.");
+      setAccelMsg("Couldn't invoke Winslow. Please try again.");
     } finally {
       setAccelBusy(false);
     }
@@ -654,14 +656,14 @@ export function LivingReport({
           {accelOpen && (
             <div className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-panel shadow-xl">
               <div className="border-b border-line px-3 py-2 text-[11px] uppercase tracking-wide text-dim">
-                Invoke the orchestrator
+                Invoke Winslow
               </div>
               <button
                 type="button"
                 onClick={() => invokeOrchestrator("run")}
                 className="block w-full px-3 py-2 text-left text-[13px] text-ink transition-colors hover:bg-panel2"
               >
-                Run the orchestrator now
+                Run Winslow now
               </button>
               <button
                 type="button"

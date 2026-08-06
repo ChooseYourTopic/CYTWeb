@@ -5,8 +5,18 @@ export function cn(...inputs: ClassValue[]): string {
   return clsx(inputs);
 }
 
+/**
+ * Product-facing display names for agent types whose presented name differs
+ * from the humanized id. The internal agent_type id ("orchestrator") is
+ * unchanged — only the label shown to owners is overridden.
+ */
+export const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  orchestrator: "Winslow",
+};
+
 /** Turn an agent_type / section key into a human label. */
 export function label(id: string): string {
+  if (AGENT_DISPLAY_NAMES[id]) return AGENT_DISPLAY_NAMES[id];
   return id
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());

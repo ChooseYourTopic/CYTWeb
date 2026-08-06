@@ -341,7 +341,7 @@ function AgentDetailView({
         {review && (
           <div className="mb-2 rounded-[10px] border border-[#3a2f12] bg-[#1c160a] p-3">
             <div className="text-[12px] font-medium text-warn">
-              Orchestrator review
+              Winslow review
             </div>
             <div className="mt-1 text-[12px] text-ink/90">
               {review.orchestrator_review}
@@ -440,7 +440,7 @@ function AgentDetailView({
                   <button
                     onClick={() => prioritize(t.id)}
                     disabled={busyId === t.id}
-                    title="Ask the orchestrator to move this up (and any blocking dependencies)"
+                    title="Ask Winslow to move this up (and any blocking dependencies)"
                     className="flex shrink-0 items-center gap-1 rounded-lg border border-[#223257] bg-brand/10 px-2.5 py-1 text-[12px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
                   >
                     {busyId === t.id ? (

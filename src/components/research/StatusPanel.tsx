@@ -69,7 +69,7 @@ export function StatusPanel({ topicId }: { topicId: string }) {
       <div>
         <h3 className="text-[15px] font-semibold">Status</h3>
         <p className="text-[13px] text-mut">
-          Live indicators for the orchestrator and every agent on the job.
+          Live indicators for Winslow and every agent on the job.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export function StatusPanel({ topicId }: { topicId: string }) {
           />
         </span>
         <div>
-          <div className="text-[14px] font-bold text-ink">Orchestrator</div>
+          <div className="text-[14px] font-bold text-ink">Winslow</div>
           <div className="text-[12.5px] text-mut">
             {orchLight === "green"
               ? "Orchestrating — planning and delegating right now."
