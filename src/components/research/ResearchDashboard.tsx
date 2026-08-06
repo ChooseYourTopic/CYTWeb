@@ -290,7 +290,33 @@ export function ResearchDashboard({
   const findings = overview?.kpis?.findings ?? 0;
 
   return (
-    <main className="mx-auto max-w-[1180px] px-6 pb-16">
+    <main
+      className="mx-auto max-w-[1180px] px-6 pb-16"
+      // Page identity: stamps the accessing owner + their license + this topic
+      // onto the page element itself, so the page is self-identifying and can be
+      // matched to the license of whoever is viewing it (the server-side
+      // ownership + license wall remains the real enforcement; this is the
+      // client-visible identifier). access_sig is the signed, owner+license-bound
+      // handle echoed back as X-Topic-Signature.
+      id={
+        overview?.user_id
+          ? `topic-${topicId}-user-${overview.user_id}`
+          : `topic-${topicId}`
+      }
+      data-topic-id={topicId}
+      data-user-id={overview?.user_id ?? undefined}
+      data-license-id={overview?.license?.id ?? undefined}
+      data-license-type={overview?.license?.type ?? undefined}
+      data-license-status={overview?.license?.status ?? undefined}
+      data-access-sig={overview?.access_sig ?? undefined}
+      data-page-identity={
+        overview?.user_id
+          ? `t${topicId}·u${overview.user_id}${
+              overview.license?.id ? `·${overview.license.id}` : ""
+            }`
+          : undefined
+      }
+    >
       {/* Top bar */}
       <header className="mb-6 mt-6 flex items-center justify-between gap-3">
         <Link

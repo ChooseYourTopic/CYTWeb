@@ -379,6 +379,9 @@ export type TopicOverview = {
   // real gate; these are for display/identity-match only, never the access check.
   user_id?: number;
   license?: License;
+  // Tamper-evident, owner + license-bound signature for this topic (the signed
+  // identity "hash"). Non-secret; safe to stamp on the page as an identifier.
+  access_sig?: string;
   tagline?: string;
   cycle_day?: number;
   cycle_phase?: string;
@@ -1340,6 +1343,7 @@ export const cytapi = {
       topic: raw?.company?.topic ?? "",
       user_id: raw?.user_id,
       license: raw?.license,
+      access_sig: raw?.access_sig,
       tagline: raw?.company?.value_prop,
       exec_summary: plan.summary ?? raw?.company?.mission,
       cycle_day: raw?.cycle_day,
