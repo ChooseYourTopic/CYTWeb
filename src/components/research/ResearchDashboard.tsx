@@ -14,6 +14,7 @@ import { ContextPanel } from "@/components/research/ContextPanel";
 import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
 import { StatusPanel } from "@/components/research/StatusPanel";
+import { TeamStatusPanel } from "@/components/research/TeamStatusPanel";
 import { AutomationsPanel } from "@/components/research/AutomationsPanel";
 import { NetworkPanel } from "@/components/research/NetworkPanel";
 import { SecurityPanel } from "@/components/research/SecurityPanel";
@@ -396,6 +397,7 @@ export function ResearchDashboard({
             )}
             {active === "models" && <ModelsPanel />}
             {active === "status" && <StatusPanel topicId={topicId} />}
+            {active === "team" && <TeamStatusPanel topicId={topicId} />}
             {active === "automations" && <AutomationsPanel />}
             {active === "network" && <NetworkPanel />}
             {active === "security" && <SecurityPanel />}

@@ -852,6 +852,61 @@ export function LivingReport({
       {/* Always-alive signal: queued / working / stalled / idle. */}
       <WorkStateBanner activity={overview?.activity} />
 
+      {/* Business profile — sits right under the header description, ahead of the
+          deeper report sections. Summary + bullet points about the topic, drawn
+          from the strategist's real positioning/goals. */}
+      {overview?.business_profile &&
+        (overview.business_profile.summary ||
+          overview.business_profile.bullets?.length) && (
+          <div className="animate-rise overflow-hidden rounded-[11px] border border-line bg-panel2">
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+              <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+                <Bot size={15} className="text-brand" /> Business profile
+              </span>
+              {overview.business_profile.grounded === false && (
+                <span
+                  title="A provisional sketch — sharpens as the strategist finishes the plan"
+                  className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim"
+                >
+                  Draft
+                </span>
+              )}
+            </div>
+            <div className="border-t border-line px-4 py-3.5">
+              {overview.business_profile.summary && (
+                <p className="text-[14px] leading-relaxed text-ink/90">
+                  {overview.business_profile.summary}
+                </p>
+              )}
+              {overview.business_profile.bullets?.length ? (
+                <ul className="mt-3 space-y-1.5">
+                  {overview.business_profile.bullets.map((b, i) => {
+                    const m = b.match(/^([^:]+):\s(.+)$/);
+                    return (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-[13.5px] text-ink/90"
+                      >
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                        {m ? (
+                          <span>
+                            <span className="font-semibold text-ink">
+                              {m[1]}:
+                            </span>{" "}
+                            {m[2]}
+                          </span>
+                        ) : (
+                          <span>{b}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+        )}
+
       <CollapsibleSection
         title="Cue Winslow"
         open={isOpen("decided")}

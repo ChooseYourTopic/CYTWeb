@@ -296,6 +296,7 @@ export type SectionKey =
   | "integrations"
   | "models"
   | "status"
+  | "team"
   | "competitors"
   | "market"
   | "drafts"
@@ -398,6 +399,13 @@ export type TopicOverview = {
   };
   spark?: { t: string; v: number }[];
   items?: SectionItem[];
+  // A compact business profile (summary + bullets about the topic) for the
+  // overview header. `grounded` is false while it's still a provisional sketch.
+  business_profile?: {
+    summary: string;
+    grounded?: boolean;
+    bullets: string[];
+  };
 };
 
 /* --------------------- KPI-tile drill-down (modal) types ------------------- */
@@ -1162,6 +1170,34 @@ export type SupportAgentRow = {
   open_assigned: number;
 };
 
+/* --------------------- Winslow team check-in (coordination) --------------- */
+
+export type TeamAgentState = "on_track" | "idle" | "blocked" | "never_run";
+
+export type TeamRosterAgent = {
+  agent_type: string;
+  role: string;
+  state: TeamAgentState;
+  state_label: string;
+  focus: string;
+  note: string;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+  tasks_pending?: number;
+  tasks_failed?: number;
+};
+
+export type TeamStatus = {
+  company_id: number | null;
+  generated_at?: string | null;
+  source?: string;
+  generated_by?: string;
+  summary: string;
+  coordination_notes: string[];
+  stats: Partial<Record<TeamAgentState | "total", number>>;
+  roster: TeamRosterAgent[];
+};
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -1183,6 +1219,21 @@ export const cytapi = {
       `/agents/${agentType}/detail${cq(companyId)}`,
       companyId ? { headers: sigHeaders(companyId) } : {},
     ),
+
+  // Winslow team check-in — the latest coordination snapshot across the roster
+  // (per-agent state + Winslow's notes), topic-scoped like the agent grid.
+  teamStatus: (companyId?: string | number) =>
+    request<TeamStatus>(
+      `/team/status${cq(companyId)}`,
+      companyId ? { headers: sigHeaders(companyId) } : {},
+    ),
+  // Manual trigger — run a fresh team check-in now and return it.
+  teamCheckIn: (companyId?: string | number) =>
+    request<TeamStatus>(`/team/check-in${cq(companyId)}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+      ...(companyId ? { headers: sigHeaders(companyId) } : {}),
+    }),
 
   // Standard-schema agent profile(s) for one owned topic — role/model/skills/
   // loops/prompt-summary/cadence + the realign-override state. Session-authed,
@@ -1286,6 +1337,7 @@ export const cytapi = {
       exec_summary: plan.summary ?? raw?.company?.mission,
       cycle_day: raw?.cycle_day,
       cycle_phase: raw?.cycle_phase,
+      business_profile: raw?.business_profile,
       run_mode: raw?.run_mode,
       run_source: raw?.run_source,
       paused: raw?.paused,
