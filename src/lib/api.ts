@@ -1535,6 +1535,9 @@ export const cytapi = {
       `/me/topics/${id}/context/extract`,
       { transcript },
     ),
+  // After a context save, Winslow reviews it and returns clarifying questions.
+  probeContext: (id: string | number) =>
+    client.post<{ questions: string[] }>(`/me/topics/${id}/context/probe`, {}),
   // Push-to-talk / typed cue → Winslow triages it and routes it to the right
   // specialist agent's queue (owner-scoped). Returns his triage ticket + the
   // routed task (once the triage has run).

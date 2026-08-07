@@ -114,6 +114,8 @@ export function ContextPanel({ topicId }: { topicId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [probeQuestions, setProbeQuestions] = useState<string[]>([]);
+  const [probing, setProbing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,7 +241,17 @@ export function ContextPanel({ topicId }: { topicId: string }) {
         competitor_notes: ctx.competitor_notes ?? "",
         notes: ctx.notes ?? "",
       });
-      setMsg({ ok: true, text: "Saved." });
+      // Saving flags Winslow to review (server-side cue) — then he probes the owner.
+      setMsg({ ok: true, text: "Saved — Winslow is reviewing your context." });
+      setProbing(true);
+      try {
+        const r = await cytapi.probeContext(topicId);
+        setProbeQuestions(r.questions ?? []);
+      } catch {
+        /* probe is best-effort */
+      } finally {
+        setProbing(false);
+      }
     } catch {
       setMsg({ ok: false, text: "Couldn't save. Please try again." });
     } finally {
@@ -257,7 +269,7 @@ export function ContextPanel({ topicId }: { topicId: string }) {
 
   return (
     <div className="space-y-4 p-4">
-      {/* Header — survey intro + rough market valuation top-right. */}
+      {/* Header — survey intro + Save (top) + rough market valuation. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-[15px] font-semibold">Context survey</h3>
@@ -265,17 +277,77 @@ export function ContextPanel({ topicId }: { topicId: string }) {
             The more your team knows, the sharper the work. Fill in what you can.
           </p>
         </div>
-        <div className="shrink-0 rounded-xl border border-line bg-panel2 px-4 py-2.5 text-right">
-          <div className="flex items-center justify-end gap-1 text-[10.5px] uppercase tracking-wide text-mut">
-            <TrendingUp size={11} className="text-brand" /> Est. valuation in this
-            space
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy}
+            className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-bold text-bg disabled:opacity-60"
+          >
+            {busy ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            Save context
+          </button>
+          <div className="shrink-0 rounded-xl border border-line bg-panel2 px-4 py-2.5 text-right">
+            <div className="flex items-center justify-end gap-1 text-[10.5px] uppercase tracking-wide text-mut">
+              <TrendingUp size={11} className="text-brand" /> Est. valuation
+            </div>
+            <div className="text-[19px] font-bold text-ink">
+              {formatValuation(valuation)}
+            </div>
+            <div className="text-[10.5px] text-dim">rough estimate</div>
           </div>
-          <div className="text-[19px] font-bold text-ink">
-            {formatValuation(valuation)}
-          </div>
-          <div className="text-[10.5px] text-dim">rough estimate</div>
         </div>
       </div>
+
+      {msg && (
+        <p
+          className={`rounded-lg border px-3 py-2 text-[12.5px] ${
+            msg.ok
+              ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
+              : "border-[#4a1f24] bg-[#1c0e10] text-bad"
+          }`}
+        >
+          {msg.text}
+        </p>
+      )}
+
+      {/* Winslow reviews the saved context and probes for what he needs to learn. */}
+      {(probing || probeQuestions.length > 0) && (
+        <div className="rounded-xl border border-brand/30 bg-brand/5 p-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+            <Sparkles size={14} className="text-brand" /> Winslow is reviewing — help
+            him understand
+          </div>
+          {probing ? (
+            <div className="flex items-center gap-2 text-[12.5px] text-mut">
+              <Loader2 size={13} className="animate-spin" /> Winslow is reviewing your
+              context…
+            </div>
+          ) : (
+            <>
+              <ul className="space-y-1.5">
+                {probeQuestions.map((q, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2 text-[13px] text-ink/90"
+                  >
+                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                    {q}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11.5px] text-dim">
+                Answer any of these in the fields below (or the recorder), then Save
+                again to sharpen the plan.
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         {/* Voice recorder → auto-extract context. Sits above the survey fields. */}
@@ -426,26 +498,6 @@ export function ContextPanel({ topicId }: { topicId: string }) {
             placeholder="Constraints, brand voice, must-haves…"
           />
         </Field>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={save}
-            disabled={busy}
-            className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
-          >
-            {busy ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <Save size={15} />
-            )}
-            Save context
-          </button>
-          {msg && (
-            <span className={`text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
-              {msg.text}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Agent-generated competitor research */}

@@ -15,7 +15,6 @@ import { IntegrationsPanel } from "@/components/research/IntegrationsPanel";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
 import { StatusPanel } from "@/components/research/StatusPanel";
 import { TeamStatusPanel } from "@/components/research/TeamStatusPanel";
-import { AgentTeamButton } from "@/components/research/AgentTeamButton";
 import { AutomationsPanel } from "@/components/research/AutomationsPanel";
 import { NetworkPanel } from "@/components/research/NetworkPanel";
 import { SecurityPanel } from "@/components/research/SecurityPanel";
@@ -331,7 +330,6 @@ export function ResearchDashboard({
         </Link>
 
         <div className="flex items-center gap-2">
-          <AgentTeamButton topicId={topicId} />
           <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
           <ProjectPauseToggle
             paused={paused}
