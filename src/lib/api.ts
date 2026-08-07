@@ -896,6 +896,16 @@ export type TopicContext = {
   notes?: string | null;
 };
 
+/** Structured context extracted from a spoken/typed description. */
+export type ContextExtraction = {
+  goals: string;
+  categories: string[];
+  target_market: string;
+  competitor_notes: string;
+  notes: string;
+  transcript: string;
+};
+
 export type MyTopicsResponse = {
   user: { id: number; name: string | null; phone: string | null };
   count: number;
@@ -1479,6 +1489,13 @@ export const cytapi = {
     client.get<{ context: TopicContext }>(`/me/topics/${id}/context`),
   saveTopicContext: (id: string | number, patch: TopicContext) =>
     client.put<{ context: TopicContext }>(`/me/topics/${id}/context`, patch),
+  // Turn a recorded/typed description into structured context (goals, category tags,
+  // target market, competitors) for the user to review, tweak, and save.
+  extractContext: (id: string | number, transcript: string) =>
+    client.post<{ extracted: ContextExtraction }>(
+      `/me/topics/${id}/context/extract`,
+      { transcript },
+    ),
   // Push-to-talk / typed cue → Winslow triages it and routes it to the right
   // specialist agent's queue (owner-scoped). Returns his triage ticket + the
   // routed task (once the triage has run).

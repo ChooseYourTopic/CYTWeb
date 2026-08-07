@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, Upload, Users, TrendingUp } from "lucide-react";
-import { cytapi, type TopicContext, type SectionItem } from "@/lib/api";
+import {
+  Loader2,
+  Save,
+  Upload,
+  Users,
+  TrendingUp,
+  Mic,
+  Square,
+  Sparkles,
+} from "lucide-react";
+import {
+  cytapi,
+  type TopicContext,
+  type SectionItem,
+  type ContextExtraction,
+} from "@/lib/api";
+import { useSpeechInput } from "@/hooks/useSpeechInput";
 
 const CATEGORY_OPTIONS = [
   "Food & Drink",
@@ -126,6 +141,64 @@ export function ContextPanel({ topicId }: { topicId: string }) {
     setCtx((prev) => ({ ...prev, [k]: v }));
   }
 
+  // --- Voice recorder → structured context extraction ---
+  const [transcript, setTranscript] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const speech = useSpeechInput({
+    onFinal: (t) => setTranscript((prev) => (prev ? `${prev} ${t}` : t)),
+  });
+
+  function applyExtraction(ex: ContextExtraction) {
+    setCtx((prev) => {
+      const cats = new Set(
+        (prev.categories ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      ex.categories.forEach((c) => cats.add(c)); // auto-select the surfaced tags
+
+      const appendLine = (cur: string | null | undefined, add: string) => {
+        const a = add.trim();
+        if (!a) return cur ?? "";
+        const c = (cur ?? "").trimEnd();
+        return c ? `${c}\n${a}` : a;
+      };
+
+      return {
+        ...prev,
+        categories: [...cats].join(", "),
+        goals: appendLine(prev.goals, ex.goals),
+        target_market: (prev.target_market ?? "").trim()
+          ? prev.target_market
+          : ex.target_market || prev.target_market,
+        competitor_notes: appendLine(prev.competitor_notes, ex.competitor_notes),
+        notes: appendLine(prev.notes, ex.notes),
+      };
+    });
+  }
+
+  async function extractNow() {
+    const t = transcript.trim();
+    if (!t || extracting) return;
+    setExtracting(true);
+    setMsg(null);
+    try {
+      const { extracted } = await cytapi.extractContext(topicId, t);
+      applyExtraction(extracted);
+      setTranscript("");
+      const n = extracted.categories.length;
+      setMsg({
+        ok: true,
+        text: `Added to context — ${n} categor${n === 1 ? "y" : "ies"} flagged. Review the bubbles below, deselect any that don't fit, then Save.`,
+      });
+    } catch {
+      setMsg({ ok: false, text: "Couldn't process that description — try again." });
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   // Categories are multi-select bubbles, persisted as a comma-joined string.
   const selectedCats = new Set(
     (ctx.categories ?? "")
@@ -150,6 +223,9 @@ export function ContextPanel({ topicId }: { topicId: string }) {
 
   // Rough valuation — categories + target market + competitor notes + context.
   const valuation = computeValuation(ctx, [...selectedCats]);
+
+  // The fixed spaces PLUS any tags surfaced from a recording — all toggleable.
+  const allCategories = Array.from(new Set([...CATEGORY_OPTIONS, ...selectedCats]));
 
   async function save() {
     if (busy) return;
@@ -202,6 +278,86 @@ export function ContextPanel({ topicId }: { topicId: string }) {
       </div>
 
       <div className="space-y-3">
+        {/* Voice recorder → auto-extract context. Sits above the survey fields. */}
+        <div className="rounded-xl border border-brand/30 bg-brand/5 p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+            <Sparkles size={14} className="text-brand" /> Describe your idea out loud
+          </div>
+          <p className="mb-2 text-[12px] text-mut">
+            Record a quick description — we&apos;ll transcribe it and pull out your
+            goals, categories, and market. Category tags appear pre-selected below;
+            keep the ones that fit and deselect the rest, then Save.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {speech.supported && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (speech.listening) speech.stop();
+                  else {
+                    setTranscript("");
+                    speech.start();
+                  }
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  speech.listening
+                    ? "animate-pulse border-bad/50 bg-bad/10 text-bad"
+                    : "border-line bg-panel2 text-ink hover:border-[#31384c]"
+                }`}
+              >
+                {speech.listening ? <Square size={13} /> : <Mic size={13} />}
+                {speech.listening ? "Stop" : "Record"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={extractNow}
+              disabled={!transcript.trim() || extracting || speech.listening}
+              className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-bg disabled:opacity-50"
+            >
+              {extracting ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Sparkles size={13} />
+              )}
+              Add to context
+            </button>
+            {speech.listening && (
+              <span className="text-[12px] font-semibold text-brand">
+                ● listening…
+              </span>
+            )}
+          </div>
+
+          {speech.listening ? (
+            <div className="mt-2 min-h-[60px] rounded-lg border border-line bg-panel px-3 py-2 text-[13px] text-ink/90">
+              {transcript}{" "}
+              <span className="text-mut">{speech.interim}</span>
+              {!transcript && !speech.interim && (
+                <span className="text-dim">Listening… start describing your idea.</span>
+              )}
+            </div>
+          ) : (
+            <textarea
+              className="cyt-input mt-2 w-full resize-y text-[13px]"
+              rows={3}
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder={
+                speech.supported
+                  ? "…your recorded words appear here (you can edit them before adding)"
+                  : "Voice input isn't supported in this browser — type your idea and we'll extract the context."
+              }
+            />
+          )}
+          {speech.error === "not-allowed" && (
+            <p className="mt-1.5 text-[11.5px] text-warn">
+              Microphone access was blocked — allow it in your browser to record.
+            </p>
+          )}
+        </div>
+
         <Field label="Goals" hint="What does success look like?">
           <textarea
             className="cyt-input min-h-[72px]"
@@ -224,9 +380,9 @@ export function ContextPanel({ topicId }: { topicId: string }) {
           </div>
         </Field>
 
-        <Field label="Categories" hint="Pick any that fit">
+        <Field label="Categories" hint="Pick any that fit — recorded tags appear pre-selected">
           <div className="flex flex-wrap gap-1.5">
-            {CATEGORY_OPTIONS.map((c) => {
+            {allCategories.map((c) => {
               const on = selectedCats.has(c);
               return (
                 <button
