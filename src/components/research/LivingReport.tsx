@@ -21,6 +21,7 @@ import {
   Send,
 } from "lucide-react";
 import { CueWinslow } from "@/components/research/CueWinslow";
+import { ValuePropCharts } from "@/components/research/ValuePropCharts";
 import { ChestIcon } from "@/components/research/Chest";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
@@ -79,10 +80,11 @@ const TIERS: Tier[] = [
 
 // Report sections, top to bottom.
 const SECTION_ORDER = [
-  "decided",
   "next_steps",
-  "achievements",
+  "decided",
+  "business_profile",
   "value_prop",
+  "achievements",
   "plan",
   "goals",
 ];
@@ -830,11 +832,6 @@ export function LivingReport({
               </button>
             </div>
           )}
-          {accelMsg && (
-            <div className="absolute left-0 top-full mt-1 whitespace-nowrap text-[11.5px] text-good">
-              {accelMsg}
-            </div>
-          )}
         </div>
         {TIERS.map((t) => (
           <button
@@ -849,72 +846,20 @@ export function LivingReport({
         ))}
       </div>
 
+      {/* Accelerate-now confirmation — in normal flow so it never overlaps the
+          banner or the sections below. */}
+      {accelMsg && (
+        <div className="rounded-lg border border-[#1f3d2e] bg-[#0e1c16] px-3 py-1.5 text-[12px] font-semibold text-good">
+          {accelMsg}
+        </div>
+      )}
+
       {/* Always-alive signal: queued / working / stalled / idle. */}
       <WorkStateBanner activity={overview?.activity} />
 
-      {/* Business profile — sits right under the header description, ahead of the
-          deeper report sections. Summary + bullet points about the topic, drawn
-          from the strategist's real positioning/goals. */}
-      {overview?.business_profile &&
-        (overview.business_profile.summary ||
-          overview.business_profile.bullets?.length) && (
-          <div className="animate-rise overflow-hidden rounded-[11px] border border-line bg-panel2">
-            <div className="flex items-center justify-between gap-2 px-4 py-3">
-              <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
-                <Bot size={15} className="text-brand" /> Business profile
-              </span>
-              {overview.business_profile.grounded === false && (
-                <span
-                  title="A provisional sketch — sharpens as the strategist finishes the plan"
-                  className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim"
-                >
-                  Draft
-                </span>
-              )}
-            </div>
-            <div className="border-t border-line px-4 py-3.5">
-              {overview.business_profile.summary && (
-                <p className="text-[14px] leading-relaxed text-ink/90">
-                  {overview.business_profile.summary}
-                </p>
-              )}
-              {overview.business_profile.bullets?.length ? (
-                <ul className="mt-3 space-y-1.5">
-                  {overview.business_profile.bullets.map((b, i) => {
-                    const m = b.match(/^([^:]+):\s(.+)$/);
-                    return (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-[13.5px] text-ink/90"
-                      >
-                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                        {m ? (
-                          <span>
-                            <span className="font-semibold text-ink">
-                              {m[1]}:
-                            </span>{" "}
-                            {m[2]}
-                          </span>
-                        ) : (
-                          <span>{b}</span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-      <CollapsibleSection
-        title="Cue Winslow"
-        open={isOpen("decided")}
-        onToggle={() => toggle("decided")}
-      >
-        <CueWinslow topicId={topicId} />
-      </CollapsibleSection>
-
+      {/* Report sections (all collapsible): Recommended next steps → Cue Winslow →
+          Business profile → Value proposition (with earning-potential charts) →
+          Recent achievements → The plan → Challenges. */}
       <CollapsibleSection
         title="Recommended next steps"
         open={isOpen("next_steps")}
@@ -936,6 +881,74 @@ export function LivingReport({
       </CollapsibleSection>
 
       <CollapsibleSection
+        title="Cue Winslow"
+        open={isOpen("decided")}
+        onToggle={() => toggle("decided")}
+      >
+        <CueWinslow topicId={topicId} />
+      </CollapsibleSection>
+
+      {overview?.business_profile &&
+        (overview.business_profile.summary ||
+          overview.business_profile.bullets?.length) && (
+          <CollapsibleSection
+            title="Business profile"
+            open={isOpen("business_profile")}
+            onToggle={() => toggle("business_profile")}
+          >
+            {overview.business_profile.grounded === false && (
+              <span
+                title="A provisional sketch — sharpens as the strategist finishes the plan"
+                className="mb-2.5 inline-block rounded-full border border-line bg-panel px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim"
+              >
+                Draft
+              </span>
+            )}
+            {overview.business_profile.summary && (
+              <p className="text-[14px] leading-relaxed text-ink/90">
+                {overview.business_profile.summary}
+              </p>
+            )}
+            {overview.business_profile.bullets?.length ? (
+              <ul className="mt-3 space-y-1.5">
+                {overview.business_profile.bullets.map((b, i) => {
+                  const m = b.match(/^([^:]+):\s(.+)$/);
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-start gap-2 text-[13.5px] text-ink/90"
+                    >
+                      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
+                      {m ? (
+                        <span>
+                          <span className="font-semibold text-ink">{m[1]}:</span>{" "}
+                          {m[2]}
+                        </span>
+                      ) : (
+                        <span>{b}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </CollapsibleSection>
+        )}
+
+      {valueProp && (
+        <CollapsibleSection
+          title="Value proposition"
+          open={isOpen("value_prop")}
+          onToggle={() => toggle("value_prop")}
+        >
+          <p className="text-[14px] leading-relaxed text-ink/90">
+            {valueProp.summary}
+          </p>
+          <ValuePropCharts seedKey={topicId ?? projectName} />
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection
         title="Recent achievements"
         open={isOpen("achievements")}
         onToggle={() => toggle("achievements")}
@@ -955,18 +968,6 @@ export function LivingReport({
           </p>
         )}
       </CollapsibleSection>
-
-      {valueProp && (
-        <CollapsibleSection
-          title="Value proposition"
-          open={isOpen("value_prop")}
-          onToggle={() => toggle("value_prop")}
-        >
-          <p className="text-[14px] leading-relaxed text-ink/90">
-            {valueProp.summary}
-          </p>
-        </CollapsibleSection>
-      )}
 
       {plan && (
         <CollapsibleSection
