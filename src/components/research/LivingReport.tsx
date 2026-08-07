@@ -11,8 +11,6 @@ import {
   Loader2,
   X,
   CheckCircle2,
-  CheckSquare,
-  Square,
   Gauge,
   Bot,
   Wrench,
@@ -23,6 +21,8 @@ import {
   Send,
 } from "lucide-react";
 import { CueWinslow } from "@/components/research/CueWinslow";
+import { ChestIcon } from "@/components/research/Chest";
+import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 import {
   cytapi,
@@ -986,60 +986,88 @@ export function LivingReport({
         onToggle={() => toggle("goals")}
       >
         <p className="mb-3 text-[12.5px] text-mut">
-          Clear challenges to keep {projectName} moving and earn XP toward your
-          Battle Pass — check them off as you go.
+          Open a chest to see the play — clear challenges to keep {projectName}{" "}
+          moving and earn XP toward your Battle Pass.
         </p>
-        {(["daily", "weekly", "monthly"] as const).map((cadence) => {
-          const list = goalGroups?.[cadence] ?? [];
-          return (
-            <div key={cadence} className="mb-3 last:mb-0">
-              <div className="mb-1.5 text-[11px] uppercase tracking-wide text-dim">
-                {cadence} challenge
-              </div>
-              {list.length > 0 ? (
-                <ul className="space-y-1.5">
-                  {list.map((g, i) => (
-                    <li
-                      key={g.id}
-                      className="flex items-center gap-2.5 rounded-lg border border-line bg-panel2 px-2.5 py-2"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleGoal(cadence, g.id)}
-                        aria-label={g.done ? "Mark not done" : "Mark done"}
-                        className="shrink-0"
-                      >
-                        {g.done ? (
-                          <CheckSquare size={16} className="text-good" />
-                        ) : (
-                          <Square size={16} className="text-mut" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveGoal({ cadence, goal: g })}
-                        className="group flex flex-1 items-center justify-between gap-2 text-left"
-                      >
-                        <span
-                          className={`text-[13.5px] font-medium ${g.done ? "text-dim line-through" : "text-ink/90"}`}
+        {/* The challenge board: three ranks (daily / weekly / monthly), each a row
+            of treasure chests laid left → right. A chest opens its more-info play. */}
+        <div className="overflow-hidden rounded-2xl border border-[#3a3016] bg-gradient-to-b from-[#12100a] to-[#0c0a06] p-2 shadow-[inset_0_1px_0_rgba(240,194,69,0.08)]">
+          {(["daily", "weekly", "monthly"] as const).map((cadence, rowIdx) => {
+            const list = goalGroups?.[cadence] ?? [];
+            return (
+              <div
+                key={cadence}
+                className={`flex items-center gap-3 rounded-xl px-2 py-2.5 ${
+                  rowIdx % 2 ? "bg-white/[0.015]" : ""
+                } ${rowIdx > 0 ? "mt-1 border-t border-[#241d0e]" : ""}`}
+              >
+                {/* rank label */}
+                <div className="w-[64px] shrink-0">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#e6c25a]">
+                    {cadence}
+                  </div>
+                  <div className="text-[10px] text-dim">
+                    {list.length} chest{list.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+
+                {/* chests, left → right */}
+                {list.length > 0 ? (
+                  <div className="flex flex-1 flex-wrap items-start gap-2.5">
+                    {list.map((g, i) => {
+                      const frame = frameFor(g.difficulty);
+                      const RIcon = iconFor(g.icon);
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => setActiveGoal({ cadence, goal: g })}
+                          title={`Challenge ${i + 1}${g.difficulty ? ` · ${frame.label}` : ""} — open`}
+                          className={`group relative flex w-[90px] shrink-0 flex-col items-center gap-1 rounded-xl border ${frame.border} bg-panel2/60 px-2 py-2 transition-all hover:-translate-y-0.5 hover:bg-panel2 hover:shadow-[0_8px_20px_-10px_rgba(0,0,0,0.7)]`}
                         >
-                          Challenge {i + 1}
-                        </span>
-                        <span className="shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-brand opacity-0 transition-opacity group-hover:opacity-100">
-                          View →
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[13px] text-dim">
-                  {goalGroups ? "No challenges this period." : "Loading…"}
-                </p>
-              )}
-            </div>
-          );
-        })}
+                          {/* rarity chip */}
+                          <span
+                            className={`absolute right-1 top-1 rounded px-1 text-[8.5px] font-bold uppercase tracking-wide ${frame.chip}`}
+                            title={frame.label}
+                          >
+                            {frame.label[0]}
+                          </span>
+                          {/* cleared marker */}
+                          {g.done && (
+                            <Check
+                              size={12}
+                              className="absolute left-1 top-1 text-good"
+                            />
+                          )}
+
+                          <ChestIcon open={g.done} difficulty={g.difficulty} size={44} />
+
+                          <span
+                            className={`text-[11.5px] font-semibold leading-none ${
+                              g.done ? "text-dim" : "text-ink/90"
+                            }`}
+                          >
+                            Challenge {i + 1}
+                          </span>
+
+                          {/* viewable reward */}
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-mut">
+                            <RIcon size={10} className={frame.text} />
+                            {g.points != null ? `${g.points} XP` : "reward"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="flex-1 text-[12.5px] text-dim">
+                    {goalGroups ? "No chests this period." : "Loading…"}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </CollapsibleSection>
 
       {pendingTier && (
