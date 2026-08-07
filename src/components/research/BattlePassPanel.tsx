@@ -29,6 +29,7 @@ import {
   type TopicLeaderboard,
 } from "@/lib/api";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
+import { ChallengeBoard } from "@/components/research/ChallengeBoard";
 
 /** Rank medal color for the top three; muted chip otherwise. */
 export function rankChipCls(rank: number | null): string {
@@ -541,6 +542,15 @@ export function BattlePassPanel({ topicId }: { topicId?: string }) {
             ))}
           </ol>
         )}
+      </div>
+
+      {/* Challenges — the daily / weekly / monthly chest board, below the race. */}
+      <div className="rounded-xl border border-line bg-panel2 px-4 py-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Flame size={16} className="text-brand" />
+          <span className="text-[13px] font-bold text-ink">Challenges</span>
+        </div>
+        <ChallengeBoard topicId={topicId} />
       </div>
 
       {toast && (
