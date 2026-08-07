@@ -534,6 +534,16 @@ export type AchievementShelf = {
   badges: AchievementBadge[];
 };
 
+/** One member of a topic's agent team. */
+export type TeamAgent = {
+  agent_type: string;
+  role: string;
+  stock: boolean;
+  removable: boolean;
+};
+export type AvailableAgent = { agent_type: string; role: string };
+export type AgentTeam = { team: TeamAgent[]; available: AvailableAgent[] };
+
 /* ------------------------------ Voices / TTS ------------------------------- */
 
 /** Which voice provider a topic connected. `voices` = local Kokoro (OpenAI-compatible). */
@@ -1515,6 +1525,13 @@ export const cytapi = {
   // Trophy shelf — every badge the topic can earn (plan + milestone), earned + locked.
   topicAchievements: (id: string | number) =>
     client.get<AchievementShelf>(`/me/topics/${id}/achievements`),
+  // Agent team — the stock 9 plus any added-on agents; add/remove the addable ones.
+  topicTeam: (id: string | number) =>
+    client.get<AgentTeam>(`/me/topics/${id}/team`),
+  addTopicAgent: (id: string | number, agent_type: string) =>
+    client.post<AgentTeam>(`/me/topics/${id}/team`, { agent_type }),
+  removeTopicAgent: (id: string | number, agentType: string) =>
+    client.del<AgentTeam>(`/me/topics/${id}/team/${agentType}`),
   toggleTopicGoal: (id: string | number, goalId: number) =>
     client.post<{ id: number; done: boolean; battlepass: ChallengeEffect }>(
       `/me/topics/${id}/goals/${goalId}/toggle`,
