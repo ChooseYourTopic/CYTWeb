@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { CueWinslow } from "@/components/research/CueWinslow";
 import { ValuePropCharts } from "@/components/research/ValuePropCharts";
+import { PlanBoard } from "@/components/research/PlanBoard";
 import { ChestIcon } from "@/components/research/Chest";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
@@ -969,17 +970,13 @@ export function LivingReport({
         )}
       </CollapsibleSection>
 
-      {plan && (
-        <CollapsibleSection
-          title="The plan"
-          open={isOpen("plan")}
-          onToggle={() => toggle("plan")}
-        >
-          <p className="text-[14px] leading-relaxed text-ink/90">
-            {plan.summary}
-          </p>
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection
+        title="The plan"
+        open={isOpen("plan")}
+        onToggle={() => toggle("plan")}
+      >
+        <PlanBoard summary={plan?.summary} />
+      </CollapsibleSection>
 
       <CollapsibleSection
         title="Challenges"
