@@ -1,12 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Users, Search, Plus, X, Loader2, Shield } from "lucide-react";
+import {
+  Users,
+  Search,
+  Plus,
+  X,
+  Loader2,
+  Shield,
+  ChevronLeft,
+  Activity,
+} from "lucide-react";
 import {
   cytapi,
   type AgentTeam,
   type TeamAgent,
   type AvailableAgent,
+  type AgentRecord,
 } from "@/lib/api";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 
@@ -27,7 +37,20 @@ export function AgentTeamButton({ topicId }: { topicId?: string }) {
   const [data, setData] = useState<AgentTeam | null>(null);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [recordFor, setRecordFor] = useState<string | null>(null);
+  const [record, setRecord] = useState<AgentRecord | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+
+  async function openRecord(type: string) {
+    setRecordFor(type);
+    setRecord(null);
+    if (!topicId) return;
+    try {
+      setRecord(await cytapi.agentRecord(topicId, type));
+    } catch {
+      /* fail soft */
+    }
+  }
 
   async function load() {
     if (!topicId) return;
@@ -114,7 +137,18 @@ export function AgentTeamButton({ topicId }: { topicId?: string }) {
             </div>
           </div>
 
-          <div className="max-h-[340px] overflow-y-auto p-1.5">
+          <div className="max-h-[360px] overflow-y-auto p-1.5">
+            {recordFor ? (
+              <AgentRecordView
+                type={recordFor}
+                record={record}
+                onBack={() => {
+                  setRecordFor(null);
+                  setRecord(null);
+                }}
+              />
+            ) : (
+              <>
             {!data && (
               <div className="flex items-center gap-2 px-2 py-3 text-[12.5px] text-dim">
                 <Loader2 size={13} className="animate-spin" /> Loading team…
@@ -161,6 +195,7 @@ export function AgentTeamButton({ topicId }: { topicId?: string }) {
                     key={m.agent_type}
                     label={pretty(m.agent_type)}
                     role={m.role}
+                    onClick={() => openRecord(m.agent_type)}
                     action={
                       m.removable ? (
                         <button
@@ -192,6 +227,8 @@ export function AgentTeamButton({ topicId }: { topicId?: string }) {
                 No agents match “{q}”.
               </p>
             )}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -203,18 +240,124 @@ function Row({
   label,
   role,
   action,
+  onClick,
 }: {
   label: string;
   role: string;
   action: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-panel2">
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-semibold text-ink">{label}</div>
-        <div className="truncate text-[11px] text-dim">{role}</div>
-      </div>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          title="View this agent's record"
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="truncate text-[13px] font-semibold text-ink">{label}</div>
+          <div className="truncate text-[11px] text-dim">{role}</div>
+        </button>
+      ) : (
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-ink">{label}</div>
+          <div className="truncate text-[11px] text-dim">{role}</div>
+        </div>
+      )}
       <div className="shrink-0">{action}</div>
+    </div>
+  );
+}
+
+/** An agent's identity + charter + recallable body of work. */
+function AgentRecordView({
+  type,
+  record,
+  onBack,
+}: {
+  type: string;
+  record: AgentRecord | null;
+  onBack: () => void;
+}) {
+  return (
+    <div className="px-1 py-1">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-2 inline-flex items-center gap-1 text-[12px] font-semibold text-mut hover:text-ink"
+      >
+        <ChevronLeft size={13} /> Back to team
+      </button>
+      {!record ? (
+        <div className="flex items-center gap-2 px-1 py-3 text-[12.5px] text-dim">
+          <Loader2 size={13} className="animate-spin" /> Loading record…
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <div className="text-[14px] font-bold text-ink">{pretty(type)}</div>
+            <div className="text-[11.5px] text-dim">{record.agent.role}</div>
+            {record.agent.mission && (
+              <p className="mt-1 text-[12px] leading-relaxed text-mut">{record.agent.mission}</p>
+            )}
+          </div>
+
+          {record.agent.skills.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {record.agent.skills.map((s) => (
+                <span
+                  key={s}
+                  className="rounded-full border border-line bg-panel2 px-2 py-0.5 text-[10.5px] text-mut"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              ["Runs", String(record.record.runs)],
+              ["Done", String(record.record.succeeded)],
+              ["Spent", `$${record.record.total_cost_usd.toFixed(2)}`],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-lg border border-line bg-panel2 py-1.5">
+                <div className="text-[14px] font-bold tabular-nums text-ink">{v}</div>
+                <div className="text-[10px] uppercase tracking-wide text-dim">{k}</div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center gap-1 text-[10.5px] uppercase tracking-wide text-dim">
+              <Activity size={11} /> Recent work
+            </div>
+            {record.record.recent_work.length === 0 ? (
+              <p className="text-[12px] text-dim">No work recorded yet.</p>
+            ) : (
+              <ul className="space-y-1">
+                {record.record.recent_work.map((w) => (
+                  <li
+                    key={w.run_id}
+                    className="rounded-lg border border-line bg-panel2 px-2 py-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-dim">
+                      <span className={w.status === "succeeded" ? "text-good" : w.status === "failed" ? "text-bad" : ""}>
+                        {w.status}
+                      </span>
+                      <span>{w.at ? new Date(w.at).toLocaleDateString() : ""}</span>
+                    </div>
+                    <div className="text-[12px] text-ink/90">
+                      {w.summary ?? <span className="text-dim">(no summary)</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

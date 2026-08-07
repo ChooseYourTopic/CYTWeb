@@ -544,6 +544,35 @@ export type TeamAgent = {
 export type AvailableAgent = { agent_type: string; role: string };
 export type AgentTeam = { team: TeamAgent[]; available: AvailableAgent[] };
 
+/** An agent-of-record: stable identity + charter, plus its recallable work ledger. */
+export type AgentRecord = {
+  agent: {
+    id: string;
+    role: string;
+    mission: string;
+    model: string;
+    version: string;
+    skills: string[];
+  };
+  record: {
+    runs: number;
+    succeeded: number;
+    failed: number;
+    total_cost_usd: number;
+    total_tokens: number;
+    last_active_at: string | null;
+    recent_work: {
+      run_id: number;
+      status: string;
+      summary: string | null;
+      model: string;
+      profile_version: string | null;
+      cost_usd: number;
+      at: string | null;
+    }[];
+  };
+};
+
 /* ------------------------------ Voices / TTS ------------------------------- */
 
 /** Which voice provider a topic connected. `voices` = local Kokoro (OpenAI-compatible). */
@@ -1528,6 +1557,9 @@ export const cytapi = {
   // Agent team — the stock 9 plus any added-on agents; add/remove the addable ones.
   topicTeam: (id: string | number) =>
     client.get<AgentTeam>(`/me/topics/${id}/team`),
+  // Agent-of-record — an agent's identity/charter + its recallable body of work.
+  agentRecord: (id: string | number, agentType: string) =>
+    client.get<AgentRecord>(`/me/topics/${id}/agents/${agentType}/record`),
   addTopicAgent: (id: string | number, agent_type: string) =>
     client.post<AgentTeam>(`/me/topics/${id}/team`, { agent_type }),
   removeTopicAgent: (id: string | number, agentType: string) =>
