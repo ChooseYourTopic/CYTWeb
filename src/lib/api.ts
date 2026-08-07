@@ -517,6 +517,23 @@ export type PlanAchievementItem = {
   source: string | null;
 };
 
+/** One badge on the topic's trophy shelf (a plan badge or a milestone badge). */
+export type AchievementBadge = {
+  kind: "plan" | "milestone";
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  achieved: boolean;
+  earned_at: string | null;
+  detail: string | null;
+};
+export type AchievementShelf = {
+  earned: number;
+  total: number;
+  badges: AchievementBadge[];
+};
+
 /* ------------------------------ Voices / TTS ------------------------------- */
 
 /** Which voice provider a topic connected. `voices` = local Kokoro (OpenAI-compatible). */
@@ -1478,6 +1495,9 @@ export const cytapi = {
   // Plan board — the five plan deliverables + earned badges (auto from agent work).
   topicPlan: (id: string | number) =>
     client.get<{ plans: PlanAchievementItem[] }>(`/me/topics/${id}/plan`),
+  // Trophy shelf — every badge the topic can earn (plan + milestone), earned + locked.
+  topicAchievements: (id: string | number) =>
+    client.get<AchievementShelf>(`/me/topics/${id}/achievements`),
   toggleTopicGoal: (id: string | number, goalId: number) =>
     client.post<{ id: number; done: boolean; battlepass: ChallengeEffect }>(
       `/me/topics/${id}/goals/${goalId}/toggle`,

@@ -293,7 +293,7 @@ export function BattlePassPanel({ topicId }: { topicId?: string }) {
   if (!status || !activeTrack) {
     return (
       <div className="p-6 text-[13px] text-dim">
-        Battle Pass isn&apos;t available yet — complete a challenge on the
+        Impact Pass isn&apos;t available yet — complete a challenge on the
         Overview tab to start your season.
       </div>
     );

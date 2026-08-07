@@ -6,7 +6,7 @@ import type { SectionKey } from "@/lib/api";
 
 export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "overview", label: "Overview" },
-  { key: "battlepass", label: "Battle Pass" },
+  { key: "battlepass", label: "Impact Pass" },
   { key: "context", label: "Context" },
   { key: "integrations", label: "Integrations" },
   { key: "models", label: "Models" },

@@ -23,6 +23,7 @@ import {
 import { CueWinslow } from "@/components/research/CueWinslow";
 import { ValuePropCharts } from "@/components/research/ValuePropCharts";
 import { PlanBoard } from "@/components/research/PlanBoard";
+import { TrophyShelf } from "@/components/research/TrophyShelf";
 import { ChestIcon } from "@/components/research/Chest";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
@@ -87,6 +88,7 @@ const SECTION_ORDER = [
   "value_prop",
   "achievements",
   "plan",
+  "trophies",
   "goals",
 ];
 
@@ -979,13 +981,21 @@ export function LivingReport({
       </CollapsibleSection>
 
       <CollapsibleSection
+        title="Trophy shelf"
+        open={isOpen("trophies")}
+        onToggle={() => toggle("trophies")}
+      >
+        <TrophyShelf topicId={topicId} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title="Challenges"
         open={isOpen("goals")}
         onToggle={() => toggle("goals")}
       >
         <p className="mb-3 text-[12.5px] text-mut">
           Open a chest to see the play — clear challenges to keep {projectName}{" "}
-          moving and earn XP toward your Battle Pass.
+          moving and earn XP toward your Impact Pass.
         </p>
         {/* The challenge board: three ranks (daily / weekly / monthly), each a row
             of treasure chests laid left → right. A chest opens its more-info play. */}

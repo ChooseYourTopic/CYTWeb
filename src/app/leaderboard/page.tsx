@@ -200,7 +200,7 @@ export default function LeaderboardPage() {
           </div>
         ) : (
           <div className="mb-4 rounded-xl border border-line bg-panel2 px-4 py-3 text-[12.5px] text-mut">
-            You&apos;re not on the board yet — open a topic&apos;s Battle Pass tab
+            You&apos;re not on the board yet — open a topic&apos;s Impact Pass tab
             and hit <span className="font-semibold text-ink">Join the race</span>{" "}
             to opt in.
           </div>
