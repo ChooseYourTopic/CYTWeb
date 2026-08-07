@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Briefcase,
   Map as MapIcon,
@@ -8,35 +8,28 @@ import {
   Megaphone,
   PenTool,
   Award,
-  Check,
   X,
   Lock,
   type LucideIcon,
 } from "lucide-react";
+import { cytapi, type PlanAchievementItem } from "@/lib/api";
 
 /**
  * The plan as a board of clickable deliverables — like the Challenges board. Each
- * card opens its detail (what the plan covers) and is an achievement that earns a
- * badge for the topic once completed. Achieved state is local for now (the UI layer);
- * wiring it to persist / auto-earn from real progress is a backend follow-up.
+ * card opens its detail and is an achievement that earns a badge for the topic.
+ * Badges AUTO-EARN from real agent progress and persist (GET /me/topics/{id}/plan);
+ * this component only renders that state.
  */
-type PlanItem = {
-  key: string;
-  label: string;
-  Icon: LucideIcon;
-  badge: string;
-  blurb: string;
-  deliverables: string[];
-};
 
-const PLAN_ITEMS: PlanItem[] = [
-  {
-    key: "business",
-    label: "Business plan",
+/** UI catalog — icon + copy per plan key. Earned state comes from the API. */
+const UI: Record<
+  string,
+  { Icon: LucideIcon; blurb: string; earnedBy: string; deliverables: string[] }
+> = {
+  business: {
     Icon: Briefcase,
-    badge: "Strategist",
-    blurb:
-      "The core model — who it's for, why it wins, and how it makes money.",
+    blurb: "The core model — who it's for, why it wins, and how it makes money.",
+    earnedBy: "your business planner",
     deliverables: [
       "Positioning & value proposition",
       "Target market & ideal customer",
@@ -44,55 +37,62 @@ const PLAN_ITEMS: PlanItem[] = [
       "Key milestones",
     ],
   },
-  {
-    key: "roadmap",
-    label: "Roadmap",
+  roadmap: {
     Icon: MapIcon,
-    badge: "Navigator",
     blurb: "The sequenced path from today to a running business.",
-    deliverables: [
-      "Phases & milestones",
-      "Timeline & priorities",
-      "Dependencies & risks",
-    ],
+    earnedBy: "your planner / orchestrator",
+    deliverables: ["Phases & milestones", "Timeline & priorities", "Dependencies & risks"],
   },
-  {
-    key: "financial",
-    label: "Financial plan",
+  financial: {
     Icon: LineChart,
-    badge: "Treasurer",
     blurb: "The money — projections, costs, and the path to profit.",
-    deliverables: [
-      "Revenue projections",
-      "Cost model & budget",
-      "Runway & unit economics",
-    ],
+    earnedBy: "your finance agent",
+    deliverables: ["Revenue projections", "Cost model & budget", "Runway & unit economics"],
   },
-  {
-    key: "social",
-    label: "Social media plan",
+  social: {
     Icon: Megaphone,
-    badge: "Amplifier",
     blurb: "How the brand shows up and grows an audience.",
-    deliverables: [
-      "Channel mix",
-      "Posting cadence",
-      "Growth & engagement tactics",
-    ],
+    earnedBy: "your social media agent",
+    deliverables: ["Channel mix", "Posting cadence", "Growth & engagement tactics"],
   },
-  {
-    key: "content",
-    label: "Content creation plan",
+  content: {
     Icon: PenTool,
-    badge: "Creator",
     blurb: "The content engine that fuels every channel.",
+    earnedBy: "your content agents",
     deliverables: ["Content pillars", "Editorial calendar", "Formats & SEO"],
   },
-];
+};
 
-export function PlanBoard({ summary }: { summary?: string }) {
-  const [earned, setEarned] = useState<Set<string>>(new Set());
-  const [active, setActive] = useState<PlanItem | null>(null);
+function fmtDate(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return null;
+  }
+}
+
+export function PlanBoard({ topicId, summary }: { topicId?: string; summary?: string }) {
+  const [plans, setPlans] = useState<PlanAchievementItem[] | null>(null);
+  const [active, setActive] = useState<PlanAchievementItem | null>(null);
+
+  useEffect(() => {
+    if (!topicId) return;
+    let cancelled = false;
+    cytapi
+      .topicPlan(topicId)
+      .then((r) => {
+        if (!cancelled) setPlans(r.plans);
+      })
+      .catch(() => {
+        if (!cancelled) setPlans([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId]);
+
+  const list = plans ?? [];
 
   return (
     <div>
@@ -100,13 +100,15 @@ export function PlanBoard({ summary }: { summary?: string }) {
         <p className="mb-3 text-[14px] leading-relaxed text-ink/90">{summary}</p>
       )}
       <p className="mb-2 text-[12.5px] text-mut">
-        Each plan is a challenge — open it to see what it covers, and earn its badge
-        when it&apos;s complete.
+        Each plan is a challenge — open it to see what it covers. Its badge is earned
+        automatically once your crew completes that plan.
       </p>
 
       <div className="flex flex-wrap gap-2.5">
-        {PLAN_ITEMS.map((p) => {
-          const done = earned.has(p.key);
+        {list.map((p) => {
+          const ui = UI[p.key];
+          const Icon = ui?.Icon ?? Briefcase;
+          const done = p.achieved;
           return (
             <button
               key={p.key}
@@ -119,14 +121,12 @@ export function PlanBoard({ summary }: { summary?: string }) {
                   : "border-line bg-panel2/60 hover:bg-panel2"
               }`}
             >
-              {/* badge state */}
               <span
                 className={`absolute right-1.5 top-1.5 ${done ? "text-[#f0c245]" : "text-dim"}`}
                 title={done ? `${p.badge} badge earned` : "Badge locked"}
               >
                 {done ? <Award size={14} /> : <Lock size={11} />}
               </span>
-
               <span
                 className={`grid h-10 w-10 place-items-center rounded-lg border ${
                   done
@@ -134,7 +134,7 @@ export function PlanBoard({ summary }: { summary?: string }) {
                     : "border-line bg-panel text-brand"
                 }`}
               >
-                <p.Icon size={20} />
+                <Icon size={20} />
               </span>
               <span className="text-center text-[12px] font-semibold leading-tight text-ink/90">
                 {p.label}
@@ -147,9 +147,11 @@ export function PlanBoard({ summary }: { summary?: string }) {
             </button>
           );
         })}
+        {plans === null && (
+          <span className="px-1 py-3 text-[12.5px] text-dim">Loading the plan…</span>
+        )}
       </div>
 
-      {/* Detail — mirrors the challenge more-info modal */}
       {active && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(4,6,10,0.66)] p-4"
@@ -162,19 +164,20 @@ export function PlanBoard({ summary }: { summary?: string }) {
               <div className="flex items-center gap-2.5">
                 <span
                   className={`grid h-10 w-10 place-items-center rounded-lg border ${
-                    earned.has(active.key)
+                    active.achieved
                       ? "border-[#7a5c14] bg-[#221a06] text-[#f0c245]"
                       : "border-line bg-panel2 text-brand"
                   }`}
                 >
-                  <active.Icon size={20} />
+                  {(() => {
+                    const Icon = UI[active.key]?.Icon ?? Briefcase;
+                    return <Icon size={20} />;
+                  })()}
                 </span>
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink">
-                    {active.label}
-                  </h3>
+                  <h3 className="text-[15px] font-semibold text-ink">{active.label}</h3>
                   <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-[#f0c245]">
-                    <Award size={12} /> Earns the {active.badge} badge
+                    <Award size={12} /> {active.badge} badge
                   </span>
                 </div>
               </div>
@@ -188,7 +191,7 @@ export function PlanBoard({ summary }: { summary?: string }) {
             </div>
 
             <p className="mt-3 text-[13.5px] leading-relaxed text-ink/90">
-              {active.blurb}
+              {UI[active.key]?.blurb}
             </p>
 
             <div className="mt-3">
@@ -196,11 +199,8 @@ export function PlanBoard({ summary }: { summary?: string }) {
                 What it delivers
               </div>
               <ul className="space-y-1.5">
-                {active.deliverables.map((d, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-[13px] text-ink/90"
-                  >
+                {(UI[active.key]?.deliverables ?? []).map((d, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-ink/90">
                     <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
                     {d}
                   </li>
@@ -208,30 +208,26 @@ export function PlanBoard({ summary }: { summary?: string }) {
               </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setEarned((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(active.key)) next.delete(active.key);
-                  else next.add(active.key);
-                  return next;
-                })
-              }
-              className={`mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-bold ${
-                earned.has(active.key)
-                  ? "border border-line bg-panel2 text-mut"
-                  : "cyt-gradient-bg text-bg"
+            {/* Earned state — auto, from real agent progress */}
+            <div
+              className={`mt-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] ${
+                active.achieved
+                  ? "border-[#7a5c14] bg-[#1a1408] font-semibold text-[#f0c245]"
+                  : "border-line bg-panel2 text-mut"
               }`}
             >
-              {earned.has(active.key) ? (
-                <>Achieved · tap to undo</>
+              {active.achieved ? (
+                <>
+                  <Award size={14} /> {active.badge} badge earned
+                  {fmtDate(active.achieved_at) ? ` · ${fmtDate(active.achieved_at)}` : ""}
+                </>
               ) : (
                 <>
-                  <Check size={14} /> Mark achieved — earn the {active.badge} badge
+                  <Lock size={12} /> Auto-earns when {UI[active.key]?.earnedBy ?? "your crew"}{" "}
+                  completes this plan.
                 </>
               )}
-            </button>
+            </div>
           </div>
         </div>
       )}

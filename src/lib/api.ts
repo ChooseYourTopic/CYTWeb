@@ -507,6 +507,16 @@ export type TopicGoals = {
   monthly: TopicGoal[];
 };
 
+/** One plan deliverable on the plan board, with its earned-badge state. */
+export type PlanAchievementItem = {
+  key: string;
+  label: string;
+  badge: string;
+  achieved: boolean;
+  achieved_at: string | null;
+  source: string | null;
+};
+
 /* ------------------------------ Voices / TTS ------------------------------- */
 
 /** Which voice provider a topic connected. `voices` = local Kokoro (OpenAI-compatible). */
@@ -1465,6 +1475,9 @@ export const cytapi = {
   // Interactive per-topic goals (daily / weekly / monthly momentum steps).
   topicGoals: (id: string | number) =>
     client.get<{ goals: TopicGoals }>(`/me/topics/${id}/goals`),
+  // Plan board — the five plan deliverables + earned badges (auto from agent work).
+  topicPlan: (id: string | number) =>
+    client.get<{ plans: PlanAchievementItem[] }>(`/me/topics/${id}/plan`),
   toggleTopicGoal: (id: string | number, goalId: number) =>
     client.post<{ id: number; done: boolean; battlepass: ChallengeEffect }>(
       `/me/topics/${id}/goals/${goalId}/toggle`,

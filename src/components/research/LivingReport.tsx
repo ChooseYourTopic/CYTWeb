@@ -975,7 +975,7 @@ export function LivingReport({
         open={isOpen("plan")}
         onToggle={() => toggle("plan")}
       >
-        <PlanBoard summary={plan?.summary} />
+        <PlanBoard topicId={topicId} summary={plan?.summary} />
       </CollapsibleSection>
 
       <CollapsibleSection
