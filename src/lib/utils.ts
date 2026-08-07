@@ -12,6 +12,16 @@ export function cn(...inputs: ClassValue[]): string {
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   orchestrator: "Winslow",
+  winslow_prime: "Winslow Prime",
+  // Specialist library (addable beyond the stock 9).
+  front_end_developer: "Front-End Developer",
+  back_end_developer: "Back-End Developer",
+  email_marketing_analyst: "Email Marketing Analyst",
+  research_analyst: "Research Analyst",
+  brand_designer: "Brand & Visual Designer",
+  seo_specialist: "SEO Specialist",
+  copywriter: "Conversion Copywriter",
+  data_analyst: "Data & Analytics Analyst",
 };
 
 /** Turn an agent_type / section key into a human label. */
