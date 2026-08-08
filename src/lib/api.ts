@@ -1008,6 +1008,23 @@ export type CheckoutSession = {
   simulated: boolean;
 };
 
+// Operations MCP token — the single revocable, per-user bearer that lets the
+// owner's own Claude (Claude Code today) drive their topics through the ops-mcp
+// server at $0 platform cost. The plaintext token is returned ONCE on mint;
+// afterwards status exposes only a masked label + expiry, never the secret.
+export type McpTokenStatus = {
+  connected: boolean;
+  label: string | null;
+  expires_at: string | null;
+};
+
+// The one-time mint/rotate response — `token` is the full plaintext, shown once.
+export type McpTokenMint = {
+  token: string;
+  label: string | null;
+  expires_at: string | null;
+};
+
 // Bring-your-own AI credential — how the signed-in user's agent work bills to
 // their own account. Secrets are never returned; this is status only.
 export type AiCredential = {
@@ -1702,6 +1719,15 @@ export const cytapi = {
     social_platform?: SocialPlatform | null;
     social_handle?: string | null;
   }) => client.put<UserPreferences>("/me/preferences", patch),
+
+  // Operations MCP token — one revocable, per-user bearer for driving the owner's
+  // topics from their own Claude (Claude Code). `mint` mints/rotates and returns
+  // the plaintext ONCE; `get` is masked status only; `revoke` fails it closed.
+  mcpToken: {
+    get: () => client.get<McpTokenStatus>("/me/mcp-token"),
+    mint: () => client.post<McpTokenMint>("/me/mcp-token"),
+    revoke: () => client.del<{ connected: boolean }>("/me/mcp-token"),
+  },
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the
   // user's agent usage runs on their own account.
