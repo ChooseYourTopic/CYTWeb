@@ -17,6 +17,10 @@ import {
   Copy,
   Check,
   Users,
+  Cpu,
+  Server,
+  Terminal,
+  ExternalLink,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -27,6 +31,7 @@ import {
   type MeProfile,
   type AiCredential,
   type ViewMode,
+  type McpTokenStatus,
 } from "@/lib/api";
 
 const TIMEZONES = [
@@ -153,7 +158,10 @@ export default function SettingsPage() {
           {me && <PasswordCard me={me} />}
           {me && <TwoFactorCard />}
           {me && <PreferencesCard me={me} />}
-          {cred && <AiAccountCard cred={cred} onChange={setCred} />}
+          <ConnectionModeCard />
+          <div id="ai-account" className="scroll-mt-24">
+            {cred && <AiAccountCard cred={cred} onChange={setCred} />}
+          </div>
         </div>
       </section>
     </main>
@@ -612,6 +620,310 @@ function PreferencesCard({ me }: { me: MeProfile }) {
           </span>
         )}
       </div>
+    </Card>
+  );
+}
+
+/* --------------------------- Connection mode (E22) ------------------------ */
+// "How your agents run" — the higher-level choice of HOW a topic's agents are
+// powered, distinct from WHICH credential (the AI account card below). Three
+// option bits: server-side on the user's API key (default), the user's own
+// Claude Code driving locally over the ops-mcp connector ($0 platform cost), and
+// OAuth (shown, disabled — not yet offered by Anthropic).
+//
+// PERSISTENCE: there is no `connection_mode` field on UserPreferences /
+// MeController::updatePreferences yet, so the choice is stored in localStorage as
+// an interim. A backend `connection_mode` preference field is the correlated
+// backend build (NOT added here). The selection survives reload via localStorage.
+
+type ConnectionMode = "api_key" | "claude_local" | "oauth";
+
+const CONNECTION_MODE_KEY = "cyt:connection_mode";
+
+/** The exact Claude Code MCP-add commands for the local ops connector. */
+const CONNECTOR_CMD_NPX =
+  "claude mcp add cyt-ops --env CYT_MCP_TOKEN=cyt_mcp_YOUR_TOKEN -- npx -y @chooseyourtopic/cyt-ops-connector";
+const CONNECTOR_CMD_NODE =
+  "claude mcp add cyt-ops --env CYT_MCP_TOKEN=cyt_mcp_YOUR_TOKEN -- node C:\\XTKRecall\\chooseyourtopic-rebuild\\cyt-ops-connector\\src\\index.js";
+
+const CONNECTION_OPTIONS: {
+  key: ConnectionMode;
+  Icon: typeof KeyRound;
+  title: string;
+  tagline: string;
+  badge: string;
+  disabled?: boolean;
+}[] = [
+  {
+    key: "api_key",
+    Icon: Server,
+    title: "API key — pay-as-you-go",
+    tagline:
+      "We run your agents server-side on your Anthropic API key. Billed to your Anthropic account.",
+    badge: "Default",
+  },
+  {
+    key: "claude_local",
+    Icon: Cpu,
+    title: "My Claude subscription — local",
+    tagline:
+      "Your own Claude Code works the tasks over a local connector, on your subscription. No per-token cost.",
+    badge: "$0 platform cost",
+  },
+  {
+    key: "oauth",
+    Icon: Link2,
+    title: "OAuth",
+    tagline: "Connect your account with a secure sign-in — no keys to copy.",
+    badge: "Coming soon",
+    disabled: true,
+  },
+];
+
+/** A copyable one-line shell command (never a secret — the token stays a placeholder). */
+function CommandRow({ label, cmd }: { label: string; cmd: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked — the value is still selectable */
+    }
+  }
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[12px] text-mut">{label}</span>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11.5px] font-semibold text-mut transition-colors hover:text-ink"
+        >
+          {copied ? (
+            <>
+              <Check size={12} className="text-good" /> Copied
+            </>
+          ) : (
+            <>
+              <Copy size={12} /> Copy
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="cyt-scroll overflow-auto rounded-lg border border-line bg-panel2 p-3 font-mono text-[11.5px] leading-relaxed text-ink/90">
+        {cmd}
+      </pre>
+    </div>
+  );
+}
+
+function ConnectionModeCard() {
+  const [mode, setMode] = useState<ConnectionMode>("api_key");
+  const [mcp, setMcp] = useState<McpTokenStatus | null>(null);
+
+  // Interim persistence: hydrate the saved choice, and read the per-user MCP-token
+  // status (masked — never a secret) to hint whether the local connector is wired.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CONNECTION_MODE_KEY);
+      if (saved === "api_key" || saved === "claude_local") setMode(saved);
+    } catch {
+      /* storage blocked — fall back to the default */
+    }
+    cytapi.mcpToken
+      .get()
+      .then(setMcp)
+      .catch(() => {});
+  }, []);
+
+  function choose(next: ConnectionMode) {
+    if (next === "oauth") return; // shown but not selectable yet
+    setMode(next);
+    try {
+      localStorage.setItem(CONNECTION_MODE_KEY, next);
+    } catch {
+      /* storage blocked — the choice still applies for this session */
+    }
+  }
+
+  return (
+    <Card
+      icon={Cpu}
+      title="How your agents run"
+      desc="Choose how your topics are powered — on your API key, on your own Claude subscription, or a connected account."
+    >
+      {/* Radio cards — current selection highlighted, API key is the default. */}
+      <div className="grid gap-2.5" role="radiogroup" aria-label="Connection mode">
+        {CONNECTION_OPTIONS.map((o) => {
+          const selected = mode === o.key;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-disabled={o.disabled}
+              disabled={o.disabled}
+              onClick={() => choose(o.key)}
+              className={`flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                o.disabled
+                  ? "cursor-not-allowed border-line bg-panel2 opacity-60"
+                  : selected
+                    ? "border-brand bg-brand/5"
+                    : "border-line bg-panel2 hover:border-[#31384c]"
+              }`}
+            >
+              <span
+                className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+                  selected && !o.disabled
+                    ? "bg-brand/15 text-brand"
+                    : "bg-panel text-mut"
+                }`}
+              >
+                <o.Icon size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[14px] font-bold text-ink">{o.title}</span>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10.5px] uppercase tracking-wide ${
+                      o.disabled
+                        ? "border-line text-dim"
+                        : o.key === "claude_local"
+                          ? "border-brand/40 bg-brand/10 text-brand"
+                          : "border-line text-mut"
+                    }`}
+                  >
+                    {o.badge}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[12.5px] text-mut">{o.tagline}</p>
+              </div>
+              <span
+                className={`mt-1 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+                  selected && !o.disabled
+                    ? "border-brand bg-brand"
+                    : "border-line"
+                }`}
+              >
+                {selected && !o.disabled ? (
+                  <span className="h-1.5 w-1.5 rounded-full bg-bg" />
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Setup panel for the selected mode. */}
+      <div className="mt-4">
+        {mode === "api_key" && (
+          <div className="rounded-xl border border-line bg-panel2 p-3.5">
+            <div className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+              <KeyRound size={14} className="text-brand" /> Your Anthropic key
+            </div>
+            <p className="text-[12.5px] text-mut">
+              The platform runs your agents for you, server-side, on your own
+              Anthropic API key — pay-as-you-go. Add or replace the key in the AI
+              account section below.
+            </p>
+            <a
+              href="#ai-account"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
+            >
+              <KeyRound size={14} /> Manage your API key
+            </a>
+          </div>
+        )}
+
+        {mode === "claude_local" && (
+          <div className="rounded-xl border border-brand/40 bg-brand/5 p-3.5">
+            <p className="text-[12.5px] text-mut">
+              <span className="font-semibold text-ink">How it works:</span> your own
+              Claude Code launches a small local connector and works your topic&apos;s
+              tasks on your subscription — there&apos;s no API key and no per-token
+              cost, only your Claude plan.
+            </p>
+
+            {/* Step 1 — mint the token in the Integrations tab (never shown here). */}
+            <div className="mt-3">
+              <div className="mb-1 flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-brand/15 text-[10px] font-bold text-brand">
+                  1
+                </span>
+                Mint an MCP token
+                <span
+                  className={`ml-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                    mcp?.connected
+                      ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
+                      : "border-line text-dim"
+                  }`}
+                >
+                  {mcp?.connected ? "Token active" : "No token yet"}
+                </span>
+              </div>
+              <p className="text-[12px] text-mut">
+                Open any topic&apos;s Integrations tab and use{" "}
+                <span className="font-semibold text-ink">
+                  Work with your Claude subscription
+                </span>{" "}
+                to generate a revocable{" "}
+                <span className="font-mono">cyt_mcp_</span> token (shown once).
+              </p>
+              <Link
+                href="/dashboard"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
+              >
+                <ExternalLink size={14} /> Go to a topic&apos;s Integrations tab
+              </Link>
+            </div>
+
+            {/* Step 2 — add the local connector to Claude Code (copyable command). */}
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-brand/15 text-[10px] font-bold text-brand">
+                  2
+                </span>
+                <Terminal size={14} className="text-brand" /> Add the connector to
+                Claude Code
+              </div>
+              <div className="grid gap-2.5">
+                <CommandRow
+                  label="Recommended — via npx (no checkout needed)"
+                  cmd={CONNECTOR_CMD_NPX}
+                />
+                <CommandRow label="Local checkout — via node" cmd={CONNECTOR_CMD_NODE} />
+              </div>
+              <p className="mt-2 text-[11.5px] text-dim">
+                Swap <span className="font-mono">cyt_mcp_YOUR_TOKEN</span> for the
+                token you minted in step 1. The token is yours — never share it.
+              </p>
+            </div>
+
+            {/* External-driver note. */}
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#2a2a12] bg-[#15140a] p-2.5 text-[11.5px] text-warn">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+              <span>
+                While you drive a topic this way, the server-side engine pauses for
+                that topic — you&apos;re the external driver until you disconnect.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {mode === "oauth" && (
+          <div className="rounded-xl border border-line bg-panel2 p-3.5 text-[12.5px] text-mut">
+            Connect your Claude account with a secure sign-in — no keys to copy.
+          </div>
+        )}
+      </div>
+
+      {/* OAuth availability note (always visible, since the option is disabled). */}
+      <p className="mt-3 text-[12px] text-dim">
+        OAuth is coming soon — it isn&apos;t yet available from Anthropic.
+      </p>
     </Card>
   );
 }
