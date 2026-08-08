@@ -8,6 +8,7 @@ import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
 import { cn, label, timeAgo } from "@/lib/utils";
 import {
   cytapi,
+  ApiError,
   type AgentStatus,
   type AgentDetail,
   type AgentProfile,
@@ -430,6 +431,20 @@ function AgentDetailView({
   const [realignBusy, setRealignBusy] = useState(false);
   const [realignMsg, setRealignMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Add-skill / add-loop inline forms (E2). Each is an open-on-demand form that
+  // writes to the agent's profile then refreshes it — matching saveContext/realign.
+  const [showAddSkill, setShowAddSkill] = useState(false);
+  const [skillName, setSkillName] = useState("");
+  const [skillDesc, setSkillDesc] = useState("");
+  const [skillBusy, setSkillBusy] = useState(false);
+  const [skillMsg, setSkillMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [showAddLoop, setShowAddLoop] = useState(false);
+  const [loopName, setLoopName] = useState("");
+  const [loopTrigger, setLoopTrigger] = useState("");
+  const [loopBehavior, setLoopBehavior] = useState("");
+  const [loopBusy, setLoopBusy] = useState(false);
+  const [loopMsg, setLoopMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   // E6 gate: a one-off "Run now" is an agent run, so it's blocked until a model
   // is connected (API key / OAuth, or the XTKRecall MCP entitlement).
   const { blocked: modelGated } = useModelConnected(companyId);
@@ -498,6 +513,65 @@ function AgentDetailView({
       setRealignMsg({ ok: false, text: "Couldn't revert — please try again." });
     } finally {
       setRealignBusy(false);
+    }
+  }
+
+  // Friendly message when a not-yet-built endpoint answers 404, else a generic
+  // retry line — so the UI never crashes while the correlated backend is pending.
+  function softError(e: unknown, noun: string): string {
+    if (e instanceof ApiError && e.status === 404)
+      return `Adding ${noun} isn't available yet — coming soon.`;
+    return `Couldn't add the ${noun} — please try again.`;
+  }
+
+  async function addSkill() {
+    if (!companyId || !skillName.trim() || skillBusy) return;
+    setSkillBusy(true);
+    setSkillMsg(null);
+    try {
+      await cytapi.addAgentSkill(companyId, agentType, {
+        name: skillName.trim(),
+        description: skillDesc.trim() || undefined,
+      });
+      setSkillName("");
+      setSkillDesc("");
+      setShowAddSkill(false);
+      setSkillMsg({ ok: true, text: "Skill added to this agent." });
+      await onReloadProfile();
+    } catch (e) {
+      setSkillMsg({ ok: false, text: softError(e, "skill") });
+    } finally {
+      setSkillBusy(false);
+    }
+  }
+
+  async function addLoop() {
+    if (
+      !companyId ||
+      !loopName.trim() ||
+      !loopTrigger.trim() ||
+      !loopBehavior.trim() ||
+      loopBusy
+    )
+      return;
+    setLoopBusy(true);
+    setLoopMsg(null);
+    try {
+      await cytapi.addAgentLoop(companyId, agentType, {
+        name: loopName.trim(),
+        trigger: loopTrigger.trim(),
+        behavior: loopBehavior.trim(),
+      });
+      setLoopName("");
+      setLoopTrigger("");
+      setLoopBehavior("");
+      setShowAddLoop(false);
+      setLoopMsg({ ok: true, text: "Loop added to this agent." });
+      await onReloadProfile();
+    } catch (e) {
+      setLoopMsg({ ok: false, text: softError(e, "loop") });
+    } finally {
+      setLoopBusy(false);
     }
   }
 
@@ -592,8 +666,24 @@ function AgentDetailView({
       )}
 
       <div>
-        <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
-          Skills
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[11px] uppercase tracking-wider text-dim">
+            Skills
+          </span>
+          {companyId && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddSkill((v) => !v);
+                setSkillMsg(null);
+              }}
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold text-brand transition-colors hover:bg-panel2"
+              title="Teach this agent a new skill"
+            >
+              {showAddSkill ? <X size={12} /> : <Plus size={12} />}
+              {showAddSkill ? "Close" : "Add skill"}
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {skills.map((sk) => (
@@ -605,14 +695,125 @@ function AgentDetailView({
               {sk.name}
             </span>
           ))}
+          {skills.length === 0 && !showAddSkill && (
+            <span className="text-[12px] text-dim">No skills yet.</span>
+          )}
         </div>
+
+        {showAddSkill && (
+          <div className="mt-2 space-y-2 rounded-lg border border-line bg-panel2 p-2.5">
+            <input
+              autoFocus
+              className="cyt-input"
+              value={skillName}
+              onChange={(e) => setSkillName(e.target.value)}
+              placeholder="Skill name (e.g. Keyword research)"
+            />
+            <input
+              className="cyt-input"
+              value={skillDesc}
+              onChange={(e) => setSkillDesc(e.target.value)}
+              placeholder="What it does (optional)"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={addSkill}
+                disabled={skillBusy || !skillName.trim()}
+                className="cyt-gradient-bg flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-bg disabled:opacity-60"
+              >
+                {skillBusy ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Plus size={13} />
+                )}
+                Add skill
+              </button>
+            </div>
+          </div>
+        )}
+        {skillMsg && (
+          <div
+            className={`mt-1.5 text-[12px] ${skillMsg.ok ? "text-good" : "text-bad"}`}
+          >
+            {skillMsg.text}
+          </div>
+        )}
       </div>
 
-      {loops.length > 0 && (
-        <div>
-          <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[11px] uppercase tracking-wider text-dim">
             Loops
+          </span>
+          {companyId && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddLoop((v) => !v);
+                setLoopMsg(null);
+              }}
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold text-brand transition-colors hover:bg-panel2"
+              title="Add a recurring loop for this agent"
+            >
+              {showAddLoop ? <X size={12} /> : <Plus size={12} />}
+              {showAddLoop ? "Close" : "Add loop"}
+            </button>
+          )}
+        </div>
+
+        {showAddLoop && (
+          <div className="mb-2 space-y-2 rounded-lg border border-line bg-panel2 p-2.5">
+            <input
+              autoFocus
+              className="cyt-input"
+              value={loopName}
+              onChange={(e) => setLoopName(e.target.value)}
+              placeholder="Loop name (e.g. Weekly competitor sweep)"
+            />
+            <input
+              className="cyt-input"
+              value={loopTrigger}
+              onChange={(e) => setLoopTrigger(e.target.value)}
+              placeholder="Trigger (e.g. Every Monday 9am)"
+            />
+            <textarea
+              className="cyt-input min-h-[70px]"
+              value={loopBehavior}
+              onChange={(e) => setLoopBehavior(e.target.value)}
+              placeholder="Behavior — what the agent does each time"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={addLoop}
+                disabled={
+                  loopBusy ||
+                  !loopName.trim() ||
+                  !loopTrigger.trim() ||
+                  !loopBehavior.trim()
+                }
+                className="cyt-gradient-bg flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12.5px] font-bold text-bg disabled:opacity-60"
+              >
+                {loopBusy ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Plus size={13} />
+                )}
+                Add loop
+              </button>
+            </div>
           </div>
+        )}
+        {loopMsg && (
+          <div
+            className={`mb-2 text-[12px] ${loopMsg.ok ? "text-good" : "text-bad"}`}
+          >
+            {loopMsg.text}
+          </div>
+        )}
+
+        {loops.length > 0 ? (
           <div className="space-y-1.5">
             {loops.map((lp) => (
               <div
@@ -634,8 +835,12 @@ function AgentDetailView({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          !showAddLoop && (
+            <div className="text-[12px] text-dim">No loops yet.</div>
+          )
+        )}
+      </div>
 
       {stats && (
         <div className="flex flex-wrap gap-5 text-[12px]">
