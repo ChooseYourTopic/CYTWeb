@@ -18,6 +18,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * When the admin surface requires two-factor, its endpoints answer 403 with a
+ * body naming what's missing. Maps that to the step-up the UI must run:
+ *   "enroll" — no authenticator yet (set one up), "verify" — enrolled but this
+ *   session hasn't proven a code. null = not a 2FA challenge.
+ */
+export function totpChallenge(e: unknown): "enroll" | "verify" | null {
+  if (e instanceof ApiError && e.status === 403) {
+    if (e.message.includes("totp_enrollment_required")) return "enroll";
+    if (e.message.includes("totp_required")) return "verify";
+  }
+  return null;
+}
+
 // A single in-flight refresh shared by all callers, so a burst of 401s triggers
 // exactly one /auth/refresh round-trip (the long refresh cookie mints a new short
 // access cookie) rather than a storm.
@@ -1157,6 +1171,17 @@ function cq(companyId?: string | number): string {
   return companyId ? `?company_id=${companyId}` : "";
 }
 
+/* ------------------------- Two-factor (TOTP) ------------------------------- */
+
+export type TwoFactorStatus = {
+  enabled: boolean;
+  pending: boolean;
+  verified_this_session: boolean;
+  recovery_codes_remaining: number;
+};
+
+export type TwoFactorEnroll = { secret: string; otpauth_uri: string };
+
 /* -------------------------- Support desk + admin portal -------------------- */
 
 export type TicketStatus = "open" | "pending" | "resolved" | "closed";
@@ -1538,6 +1563,22 @@ export const cytapi = {
   // After a context save, Winslow reviews it and returns clarifying questions.
   probeContext: (id: string | number) =>
     client.post<{ questions: string[] }>(`/me/topics/${id}/context/probe`, {}),
+  // Authenticator-app second factor (TOTP) for the signed-in user. Enroll →
+  // confirm (activates, shows one-time recovery codes) → verify (step-up per
+  // session for the admin surface) / disable.
+  twoFactor: {
+    status: () => client.get<TwoFactorStatus>("/me/2fa"),
+    enroll: () => client.post<TwoFactorEnroll>("/me/2fa/enroll"),
+    confirm: (code: string) =>
+      client.post<{ enabled: boolean; recovery_codes: string[] }>(
+        "/me/2fa/confirm",
+        { code },
+      ),
+    verify: (code: string) =>
+      client.post<{ verified: boolean }>("/me/2fa/verify", { code }),
+    disable: (code: string) =>
+      client.post<{ enabled: boolean }>("/me/2fa/disable", { code }),
+  },
   // Push-to-talk / typed cue → Winslow triages it and routes it to the right
   // specialist agent's queue (owner-scoped). Returns his triage ticket + the
   // routed task (once the triage has run).

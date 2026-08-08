@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { TwoFactorCard } from "@/components/security/TwoFactor";
 import {
   cytapi,
   ApiError,
@@ -150,6 +151,7 @@ export default function SettingsPage() {
           {me && <ProfileCard me={me} />}
           {me && <AffiliateCard me={me} />}
           {me && <PasswordCard me={me} />}
+          {me && <TwoFactorCard />}
           {me && <PreferencesCard me={me} />}
           {cred && <AiAccountCard cred={cred} onChange={setCred} />}
         </div>

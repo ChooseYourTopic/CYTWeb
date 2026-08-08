@@ -21,9 +21,11 @@ import {
   Inbox,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { AdminTwoFactorChallenge } from "@/components/security/TwoFactor";
 import {
   cytapi,
   ApiError,
+  totpChallenge,
   type StaffWhoami,
   type AdminOverview,
   type AdminUserRow,
@@ -116,25 +118,42 @@ export default function AdminPage() {
   const router = useRouter();
   const [whoami, setWhoami] = useState<StaffWhoami | null>(null);
   const [loading, setLoading] = useState(true);
+  const [challenge, setChallenge] = useState<"enroll" | "verify" | null>(null);
   const [tab, setTab] = useState<TabKey>("support");
 
-  useEffect(() => {
-    let alive = true;
-    cytapi.admin
-      .whoami()
-      .then((w) => {
-        if (alive) {
-          setWhoami(w);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
+  const loadWhoami = useCallback(async () => {
+    setLoading(true);
+    try {
+      const w = await cytapi.admin.whoami();
+      setWhoami(w);
+      setChallenge(null);
+    } catch (e) {
+      // The admin surface can demand a two-factor step-up (enroll or verify)
+      // before it answers — show that inline instead of bouncing to sign-in.
+      const ch = totpChallenge(e);
+      if (ch) {
+        setChallenge(ch);
+      } else {
         router.replace("/signin");
-      });
-    return () => {
-      alive = false;
-    };
+        return;
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
+
+  useEffect(() => {
+    loadWhoami();
+  }, [loadWhoami]);
+
+  if (challenge) {
+    return (
+      <main className="mx-auto max-w-[1180px] px-6 pb-24">
+        <SiteHeader />
+        <AdminTwoFactorChallenge kind={challenge} onCleared={loadWhoami} />
+      </main>
+    );
+  }
 
   if (loading || !whoami) {
     return (
