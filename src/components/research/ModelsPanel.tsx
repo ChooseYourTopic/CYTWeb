@@ -86,6 +86,7 @@ function AnthropicCredentialCard() {
 
   const connected = cred?.connected === true;
   const needsReauth = cred?.status === "needs_reauth";
+  const outOfCredits = cred?.status === "insufficient_credit";
 
   async function saveKey() {
     const k = keyInput.trim();
@@ -148,7 +149,7 @@ function AnthropicCredentialCard() {
   return (
     <div
       className={`rounded-2xl border bg-panel p-4 ${
-        connected && !needsReauth ? "border-[#1f3d2e]" : needsReauth ? "border-[#3a3320]" : "border-line"
+        outOfCredits ? "border-[#4a2020]" : connected && !needsReauth ? "border-[#1f3d2e]" : needsReauth ? "border-[#3a3320]" : "border-line"
       }`}
     >
       <div className="flex items-start gap-3">
@@ -164,6 +165,10 @@ function AnthropicCredentialCard() {
             {loading ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
                 <Loader2 size={10} className="animate-spin" /> Checking
+              </span>
+            ) : outOfCredits ? (
+              <span className="rounded-full border border-[#4a2020] bg-[#1c0e0e] px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-bad">
+                Out of credits
               </span>
             ) : connected && !needsReauth ? (
               <span className="rounded-full border border-[#1f3d2e] bg-[#0e1c16] px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-good">
@@ -182,6 +187,14 @@ function AnthropicCredentialCard() {
           <p className="mt-0.5 text-[12.5px] text-mut">
             Opus, Sonnet &amp; Haiku — powering your agents today.
           </p>
+
+          {outOfCredits && (
+            <div className="mt-2 rounded-lg border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-[12px] text-bad">
+              {cred?.status_message ||
+                "This key is out of Anthropic credits — top up or replace it."}{" "}
+              Then hit <span className="font-semibold">Test</span> to clear it.
+            </div>
+          )}
 
           {/* Connection detail */}
           {connected && (
