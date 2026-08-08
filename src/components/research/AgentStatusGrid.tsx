@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowUpCircle, Loader2, Play, Plus, Search, X } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
+import { useModelConnected } from "@/hooks/useModelConnected";
+import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
 import { cn, label, timeAgo } from "@/lib/utils";
 import {
   cytapi,
@@ -428,6 +430,10 @@ function AgentDetailView({
   const [realignBusy, setRealignBusy] = useState(false);
   const [realignMsg, setRealignMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // E6 gate: a one-off "Run now" is an agent run, so it's blocked until a model
+  // is connected (API key / OAuth, or the XTKRecall MCP entitlement).
+  const { blocked: modelGated } = useModelConnected(companyId);
+
   // Live working picture (queue/runs/actions/stats) is fail-soft: absent until
   // the detail endpoint answers. The profile drives role/skills/loops/prompt.
   const stats = d?.stats;
@@ -509,7 +515,7 @@ function AgentDetailView({
   }
 
   async function runNow() {
-    if (triggering) return;
+    if (triggering || modelGated) return;
     setTriggering(true);
     setTriggerMsg(null);
     try {
@@ -560,8 +566,12 @@ function AgentDetailView({
         </div>
         <button
           onClick={runNow}
-          disabled={triggering}
-          title="Kick a one-off run of this agent for this topic"
+          disabled={triggering || modelGated}
+          title={
+            modelGated
+              ? "Connect a model to activate your agents"
+              : "Kick a one-off run of this agent for this topic"
+          }
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#223257] bg-brand/10 px-2.5 py-1 text-[12px] font-medium text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"
         >
           {triggering ? (
@@ -572,6 +582,7 @@ function AgentDetailView({
           Run now
         </button>
       </div>
+      {modelGated && <ConnectModelPrompt />}
       {triggerMsg && <div className="text-[12px] text-good">{triggerMsg}</div>}
 
       {profile?.prompt.override_active && (

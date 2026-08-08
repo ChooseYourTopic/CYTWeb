@@ -15,6 +15,8 @@ import {
 import { cytapi, type TopicGoals, type TopicGoal } from "@/lib/api";
 import { ChestIcon } from "@/components/research/Chest";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
+import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
+import { useModelConnected } from "@/hooks/useModelConnected";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 
 function prettyAgent(name: string): string {
@@ -31,11 +33,13 @@ function GoalGuideModal({
   topicId,
   onClose,
   onToggleDone,
+  gated,
 }: {
   goal: TopicGoal;
   topicId?: string;
   onClose: () => void;
   onToggleDone: () => void;
+  gated?: boolean;
 }) {
   const guide = goal.guide;
   const primaryAgent = guide?.agents?.[0];
@@ -56,7 +60,7 @@ function GoalGuideModal({
   }
 
   async function runPrompt(text: string, i: number) {
-    if (!topicId || !primaryAgent || runningPrompt !== null) return;
+    if (!topicId || !primaryAgent || runningPrompt !== null || gated) return;
     setRunningPrompt(i);
     setRunMsg(null);
     try {
@@ -70,7 +74,7 @@ function GoalGuideModal({
   }
 
   async function triggerAgent(agentType: string) {
-    if (!topicId) return;
+    if (!topicId || gated) return;
     setRunMsg(null);
     try {
       const r = await cytapi.agentTrigger(agentType, topicId);
@@ -81,7 +85,7 @@ function GoalGuideModal({
   }
 
   async function takeOn() {
-    if (!topicId || !primaryAgent || !takeInput.trim() || taking) return;
+    if (!topicId || !primaryAgent || !takeInput.trim() || taking || gated) return;
     setTaking(true);
     setRunMsg(null);
     try {
@@ -119,6 +123,8 @@ function GoalGuideModal({
           progress, or run an action below.
         </p>
 
+        {gated && <ConnectModelPrompt className="mt-3" />}
+
         <div className="mt-4 rounded-xl border border-line bg-panel2 p-3">
           <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
             <Send size={14} className="text-brand" /> Take it on
@@ -139,7 +145,8 @@ function GoalGuideModal({
             <button
               type="button"
               onClick={takeOn}
-              disabled={!topicId || !primaryAgent || !takeInput.trim() || taking}
+              disabled={!topicId || !primaryAgent || !takeInput.trim() || taking || gated}
+              title={gated ? "Connect a model to activate your agents" : undefined}
               className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-bold text-bg disabled:opacity-50"
             >
               {taking ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -159,8 +166,14 @@ function GoalGuideModal({
                   key={a}
                   type="button"
                   onClick={() => triggerAgent(a)}
-                  disabled={!topicId}
-                  title={topicId ? `Trigger ${prettyAgent(a)} for this topic` : undefined}
+                  disabled={!topicId || gated}
+                  title={
+                    gated
+                      ? "Connect a model to activate your agents"
+                      : topicId
+                        ? `Trigger ${prettyAgent(a)} for this topic`
+                        : undefined
+                  }
                   className="rounded-lg border border-line bg-panel2 px-2 py-1 text-[12px] text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:cursor-default disabled:hover:border-line disabled:hover:text-mut"
                 >
                   {prettyAgent(a)}
@@ -218,7 +231,8 @@ function GoalGuideModal({
                     <button
                       type="button"
                       onClick={() => runPrompt(p, i)}
-                      disabled={!topicId || !primaryAgent || runningPrompt !== null}
+                      disabled={!topicId || !primaryAgent || runningPrompt !== null || gated}
+                      title={gated ? "Connect a model to activate your agents" : undefined}
                       className="inline-flex items-center gap-1 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2 py-1 text-[11.5px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-50"
                     >
                       {runningPrompt === i ? (
@@ -294,6 +308,10 @@ export function ChallengeBoard({
     goal: TopicGoal;
   } | null>(null);
   const [xpToast, setXpToast] = useState<string | null>(null);
+
+  // E6 gate: challenge actions trigger agents, so block them until a model is
+  // connected.
+  const { blocked: modelGated } = useModelConnected(topicId);
 
   useEffect(() => {
     if (!topicId) return;
@@ -428,6 +446,7 @@ export function ChallengeBoard({
         <GoalGuideModal
           goal={activeGoal.goal}
           topicId={topicId}
+          gated={modelGated}
           onClose={() => setActiveGoal(null)}
           onToggleDone={() => {
             toggleGoal(activeGoal.cadence, activeGoal.goal.id);
