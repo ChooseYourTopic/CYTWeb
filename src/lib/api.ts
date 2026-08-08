@@ -427,6 +427,9 @@ export type TopicOverview = {
     summary: string;
     grounded?: boolean;
     bullets: string[];
+    // Header tiles — the real business type + industry (null until the backend sets them).
+    business_type?: string | null;
+    industry?: string | null;
   };
 };
 

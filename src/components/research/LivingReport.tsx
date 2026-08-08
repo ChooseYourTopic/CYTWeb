@@ -954,7 +954,9 @@ export function LivingReport({
 
       {overview?.business_profile &&
         (overview.business_profile.summary ||
-          overview.business_profile.bullets?.length) && (
+          overview.business_profile.bullets?.length ||
+          overview.business_profile.business_type ||
+          overview.business_profile.industry) && (
           <CollapsibleSection
             title="Business profile"
             open={isOpen("business_profile")}
@@ -967,6 +969,31 @@ export function LivingReport({
               >
                 Draft
               </span>
+            )}
+            {(overview.business_profile.business_type ||
+              overview.business_profile.industry) && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {overview.business_profile.business_type && (
+                  <div className="rounded-xl border border-line bg-panel2 px-3 py-2">
+                    <div className="text-[10px] uppercase tracking-wide text-dim">
+                      Business type
+                    </div>
+                    <div className="text-[13px] font-semibold text-ink">
+                      {overview.business_profile.business_type}
+                    </div>
+                  </div>
+                )}
+                {overview.business_profile.industry && (
+                  <div className="rounded-xl border border-line bg-panel2 px-3 py-2">
+                    <div className="text-[10px] uppercase tracking-wide text-dim">
+                      Industry
+                    </div>
+                    <div className="text-[13px] font-semibold text-ink">
+                      {overview.business_profile.industry}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
             {overview.business_profile.summary && (
               <p className="text-[14px] leading-relaxed text-ink/90">
