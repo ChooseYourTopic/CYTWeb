@@ -11,12 +11,45 @@ import {
   KeyRound,
   Copy,
   Sparkles,
+  Terminal,
+  Globe,
+  RefreshCw,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
-import { cytapi, type XtkRecallStatus } from "@/lib/api";
+import {
+  cytapi,
+  type XtkRecallStatus,
+  type McpTokenStatus,
+  type McpTokenMint,
+} from "@/lib/api";
 import { INTEGRATIONS, type IntegrationDef } from "@/lib/integrations";
 
 /** The one tile that is a hosted, paid add-on rather than bring-your-own. */
 const XTKRECALL_KEY = "xtkrecall_mcp";
+
+/** Public Operations MCP endpoint the user's Claude Code client connects to. */
+const OPS_MCP_URL = "https://chooseyourtopic.com/ops-mcp/mcp/";
+
+/** Placeholder shown in the copyable config before a token is minted. */
+const TOKEN_PLACEHOLDER = "cyt_mcp_YOUR_TOKEN";
+
+/** The exact Claude Code MCP config (opsmcp README), with the real or placeholder token. */
+function mcpConfig(token: string | null): string {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        "cyt-ops": {
+          type: "http",
+          url: OPS_MCP_URL,
+          headers: { Authorization: `Bearer ${token ?? TOKEN_PLACEHOLDER}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
 
 /** Copy text to the clipboard, best-effort. */
 async function copyText(text: string): Promise<void> {
@@ -517,6 +550,339 @@ function ConnectModal({
   );
 }
 
+/** A readonly multi-line code block with a copy button (the MCP config JSON). */
+function CopyBlock({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[12px] text-mut">{label}</span>
+        <button
+          type="button"
+          onClick={() => {
+            void copyText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
+          className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11.5px] font-semibold text-mut transition-colors hover:text-ink"
+        >
+          {copied ? (
+            <>
+              <Check size={12} className="text-good" /> Copied
+            </>
+          ) : (
+            <>
+              <Copy size={12} /> Copy config
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="cyt-scroll max-h-56 overflow-auto rounded-lg border border-line bg-panel2 p-3 font-mono text-[11.5px] leading-relaxed text-ink/90">
+        {value}
+      </pre>
+    </div>
+  );
+}
+
+/**
+ * "Work with your Claude subscription" — the first-class MCP connect flow. A
+ * single revocable, per-user token lets the owner's own Claude (Claude Code)
+ * drive their topics at $0 platform cost. Walks: path picker (Claude Code now;
+ * hosted browser connector "coming soon"), generate/regenerate/revoke the token
+ * (plaintext shown ONCE on mint), one-click copy of the exact Claude Code MCP
+ * config, and a live connection status line. The stored token is never rendered
+ * — only the just-minted plaintext, once.
+ */
+function McpConnectModal({
+  status,
+  onClose,
+  onStatus,
+}: {
+  status: McpTokenStatus | null;
+  onClose: () => void;
+  onStatus: (s: McpTokenStatus | null) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // The just-minted plaintext token — held only in memory, shown once, never refetched.
+  const [minted, setMinted] = useState<McpTokenMint | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
+
+  const connected = !!status?.connected;
+
+  async function mint() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    setConfirmRevoke(false);
+    try {
+      const m = await cytapi.mcpToken.mint();
+      setMinted(m);
+      // Reflect connected state immediately (mint returns label/expiry too).
+      onStatus({ connected: true, label: m.label, expires_at: m.expires_at });
+      setMsg({ ok: true, text: "Token generated. Copy it now — it won't be shown again." });
+    } catch {
+      setMsg({ ok: false, text: "Couldn't generate a token. Try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke() {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await cytapi.mcpToken.revoke();
+      setMinted(null);
+      setConfirmRevoke(false);
+      onStatus({ connected: false, label: null, expires_at: null });
+      setMsg({ ok: true, text: "Token revoked. Your Claude can no longer connect." });
+    } catch {
+      setMsg({ ok: false, text: "Couldn't revoke. Try again." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const expiry = (status?.expires_at ?? minted?.expires_at) || null;
+  const expiryLabel = expiry
+    ? new Date(expiry).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="cyt-scroll max-h-[85vh] w-full max-w-[520px] overflow-y-auto rounded-2xl border border-line bg-panel p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand/15 text-brand">
+              <Sparkles size={18} />
+            </span>
+            <div>
+              <h3 className="text-[16px] font-bold text-ink">
+                Work with your Claude subscription
+                {connected ? (
+                  <span className="ml-2 align-middle text-[11px] font-semibold text-good">
+                    · Connected
+                  </span>
+                ) : null}
+              </h3>
+              <p className="text-[12px] text-mut">
+                Run your topic on your own Claude — $0 platform cost.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 text-mut transition-colors hover:text-ink"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Step 1 — pick how your Claude connects. */}
+        <div className="mt-4">
+          <div className="mb-2 text-[12px] font-semibold text-ink">1 · How your Claude connects</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex items-start gap-2 rounded-xl border border-brand/50 bg-brand/5 p-3">
+              <Terminal size={16} className="mt-0.5 shrink-0 text-brand" />
+              <div>
+                <div className="text-[13px] font-semibold text-ink">
+                  Claude Code (command line)
+                  <span className="ml-1.5 align-middle text-[10.5px] font-semibold text-good">
+                    Active
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11.5px] text-mut">
+                  Add one MCP server to your Claude Code config.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-xl border border-line bg-panel2 p-3 opacity-60">
+              <Globe size={16} className="mt-0.5 shrink-0 text-mut" />
+              <div>
+                <div className="text-[13px] font-semibold text-mut">
+                  Hosted browser connector
+                  <span className="ml-1.5 align-middle text-[10.5px] font-semibold text-dim">
+                    Coming soon
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11.5px] text-dim">
+                  Connect from Claude in the browser — on the way.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 2 — token: generate (shown once) or manage the existing one. */}
+        <div className="mt-5">
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+            <KeyRound size={14} className="text-brand" /> 2 · Your access token
+          </div>
+
+          {minted ? (
+            /* Just minted — show the plaintext ONCE, then never again. */
+            <div className="rounded-xl border border-[#3a2c14] bg-[#1c1408] p-3">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-warn">
+                <AlertTriangle size={13} /> Copy this now — you won&apos;t see it again
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  className="cyt-input flex-1 font-mono text-[12px]"
+                  value={minted.token}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyText(minted.token);
+                    setTokenCopied(true);
+                    setTimeout(() => setTokenCopied(false), 1200);
+                  }}
+                  className="shrink-0 rounded-lg border border-line px-2.5 py-2 text-mut transition-colors hover:text-ink"
+                  title="Copy token"
+                >
+                  {tokenCopied ? (
+                    <Check size={14} className="text-good" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </button>
+              </div>
+              <p className="mt-1.5 text-[11.5px] text-dim">
+                Stored hashed on our side — this is the only time the full token is shown.
+              </p>
+            </div>
+          ) : connected ? (
+            /* Connected — masked label + expiry + regenerate / revoke. */
+            <div className="rounded-xl border border-line bg-panel2 p-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1.5 font-mono text-[13px] text-ink">
+                  <ShieldCheck size={14} className="text-good" />
+                  {status?.label ?? "cyt_mcp_••••"}
+                </span>
+                {expiryLabel ? (
+                  <span className="text-[12px] text-mut">Expires {expiryLabel}</span>
+                ) : null}
+              </div>
+              <p className="mt-1.5 text-[11.5px] text-dim">
+                Your token is stored masked — regenerate to rotate it, or revoke to cut access.
+              </p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={mint}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold text-ink transition-colors hover:border-[#31384c] disabled:opacity-60"
+                >
+                  {busy ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={13} />
+                  )}
+                  Regenerate
+                </button>
+                {confirmRevoke ? (
+                  <button
+                    type="button"
+                    onClick={revoke}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a1a1a] bg-[#1c0e0e] px-3 py-1.5 text-[12.5px] font-semibold text-bad transition-colors disabled:opacity-60"
+                  >
+                    <Trash2 size={13} /> Confirm revoke
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRevoke(true)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
+                  >
+                    <Trash2 size={13} /> Revoke
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Not connected — generate the first token. */
+            <div className="rounded-xl border border-line bg-panel2 p-3.5">
+              <p className="text-[12px] text-mut">
+                Generate a single token that lets your Claude operate your topics. Shown once,
+                revocable anytime, with an absolute expiry.
+              </p>
+              <button
+                type="button"
+                onClick={mint}
+                disabled={busy}
+                className="cyt-gradient-bg mt-3 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
+              >
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
+                Generate token
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Step 3 — copy the exact Claude Code MCP config. */}
+        <div className="mt-5">
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+            <Terminal size={14} className="text-brand" /> 3 · Add it to Claude Code
+          </div>
+          <CopyBlock
+            label={
+              minted
+                ? "Config includes your new token — paste into your Claude Code config"
+                : connected
+                  ? "Paste into your Claude Code config, then swap in your token"
+                  : "Paste into your Claude Code config once you generate a token"
+            }
+            value={mcpConfig(minted?.token ?? null)}
+          />
+          {!minted ? (
+            <p className="mt-1.5 text-[11.5px] text-dim">
+              The <span className="font-mono">{TOKEN_PLACEHOLDER}</span> placeholder stands in for
+              your real token (only shown at generation time).
+            </p>
+          ) : null}
+        </div>
+
+        {/* Connection status + any message. */}
+        <div className="mt-5 flex items-center justify-between gap-2 border-t border-line pt-4">
+          <span
+            className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${
+              connected ? "text-good" : "text-mut"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${connected ? "bg-good" : "bg-dim"}`}
+            />
+            {connected ? "Connected — a token is active" : "Not connected — no active token"}
+          </span>
+          {msg ? (
+            <span className={`text-[12.5px] ${msg.ok ? "text-good" : "text-bad"}`}>
+              {msg.text}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Integrations tab — a catalog of services a topic can connect. Each Connect
  * opens a modal to enter that service's token/secret key, or to sign up for an
@@ -528,8 +894,16 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
   const [connected, setConnected] = useState<Set<string>>(new Set());
   const [active, setActive] = useState<IntegrationDef | null>(null);
   const [xtk, setXtk] = useState<XtkRecallStatus | null>(null);
+  // "Work with your Claude" MCP token — per-user (account-level), not per-topic.
+  const [mcp, setMcp] = useState<McpTokenStatus | null>(null);
+  const [mcpOpen, setMcpOpen] = useState(false);
 
   const load = useCallback(() => {
+    // The MCP connect token is per-user, so it loads regardless of a topic.
+    cytapi.mcpToken
+      .get()
+      .then(setMcp)
+      .catch(() => {});
     if (!topicId) return;
     cytapi
       .topicIntegrations(topicId)
@@ -563,6 +937,40 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
           sign up for an account to get one.
         </p>
       </div>
+
+      {/* First-class MCP connect tile — bring your own Claude, $0 platform cost. */}
+      <button
+        type="button"
+        onClick={() => setMcpOpen(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-brand/40 bg-brand/5 p-4 text-left transition-colors hover:border-brand/70"
+      >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand">
+          <Sparkles size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[14px] font-bold text-ink">
+              Work with your Claude subscription
+            </span>
+            <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-brand">
+              $0 platform cost
+            </span>
+          </div>
+          <p className="mt-0.5 text-[12.5px] text-mut">
+            Run your topic on your own Claude — connect Claude Code with one token.
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold ${
+            mcp?.connected
+              ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
+              : "border-line text-mut"
+          }`}
+        >
+          {mcp?.connected ? <Check size={12} /> : <Plug size={12} />}
+          {mcp?.connected ? "Connected" : "Connect"}
+        </span>
+      </button>
 
       <div className="grid gap-3 sm:grid-cols-2">
         {INTEGRATIONS.map((i) => {
@@ -653,6 +1061,14 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
             }
           />
         ))}
+
+      {mcpOpen && (
+        <McpConnectModal
+          status={mcp}
+          onClose={() => setMcpOpen(false)}
+          onStatus={setMcp}
+        />
+      )}
     </div>
   );
 }
