@@ -21,6 +21,8 @@ import {
   Send,
 } from "lucide-react";
 import { CueWinslow } from "@/components/research/CueWinslow";
+import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
+import { useModelConnected } from "@/hooks/useModelConnected";
 import { ValuePropCharts } from "@/components/research/ValuePropCharts";
 import { PlanBoard } from "@/components/research/PlanBoard";
 import { TrophyShelf } from "@/components/research/TrophyShelf";
@@ -240,11 +242,13 @@ function WorkStateBanner({
   agentStatuses,
   onActivate,
   activating,
+  gated,
 }: {
   activity?: TopicActivity;
   agentStatuses?: AgentStatus[];
   onActivate?: () => void;
   activating?: boolean;
+  gated?: boolean;
 }) {
   // Drive the banner off the SAME real agent-status data the KPI + lights use, so
   // it can never claim "5 agents active" when the live data says otherwise. Fall
@@ -327,21 +331,26 @@ function WorkStateBanner({
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-semibold">{config.title}</div>
         <div className="mt-0.5 text-[12.5px] text-mut">{config.body}</div>
-        {showActivate && (
-          <button
-            type="button"
-            onClick={onActivate}
-            disabled={activating}
-            className="cyt-gradient-bg mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-bg disabled:opacity-60"
-          >
-            {activating ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Rocket size={13} />
-            )}
-            Activate agents now
-          </button>
-        )}
+        {showActivate &&
+          (gated ? (
+            <div className="mt-2">
+              <ConnectModelPrompt compact />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onActivate}
+              disabled={activating}
+              className="cyt-gradient-bg mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-bg disabled:opacity-60"
+            >
+              {activating ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Rocket size={13} />
+              )}
+              Activate agents now
+            </button>
+          ))}
       </div>
     </div>
   );
@@ -355,9 +364,11 @@ function WorkStateBanner({
 function NextStepCard({
   step,
   topicId,
+  gated,
 }: {
   step: RecommendedStep;
   topicId?: string;
+  gated?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -365,7 +376,7 @@ function NextStepCard({
   const runnable = Boolean(topicId && step.agent_type);
 
   async function run() {
-    if (!runnable || busy) return;
+    if (!runnable || busy || gated) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -393,7 +404,8 @@ function NextStepCard({
           <button
             type="button"
             onClick={run}
-            disabled={busy}
+            disabled={busy || gated}
+            title={gated ? "Connect a model to activate your agents" : undefined}
             className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2.5 py-1.5 text-[11.5px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-50"
           >
             {busy ? (
@@ -405,6 +417,11 @@ function NextStepCard({
           </button>
         ) : null}
       </div>
+      {runnable && gated ? (
+        <div className="mt-2">
+          <ConnectModelPrompt compact />
+        </div>
+      ) : null}
       {(owner || step.artifact) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {owner ? (
@@ -439,11 +456,13 @@ function GoalGuideModal({
   topicId,
   onClose,
   onToggleDone,
+  gated,
 }: {
   goal: TopicGoal;
   topicId?: string;
   onClose: () => void;
   onToggleDone: () => void;
+  gated?: boolean;
 }) {
   const guide = goal.guide;
   const primaryAgent = guide?.agents?.[0];
@@ -464,7 +483,7 @@ function GoalGuideModal({
   }
 
   async function runPrompt(text: string, i: number) {
-    if (!topicId || !primaryAgent || runningPrompt !== null) return;
+    if (!topicId || !primaryAgent || runningPrompt !== null || gated) return;
     setRunningPrompt(i);
     setRunMsg(null);
     try {
@@ -478,7 +497,7 @@ function GoalGuideModal({
   }
 
   async function triggerAgent(agentType: string) {
-    if (!topicId) return;
+    if (!topicId || gated) return;
     setRunMsg(null);
     try {
       const r = await cytapi.agentTrigger(agentType, topicId);
@@ -489,7 +508,7 @@ function GoalGuideModal({
   }
 
   async function takeOn() {
-    if (!topicId || !primaryAgent || !takeInput.trim() || taking) return;
+    if (!topicId || !primaryAgent || !takeInput.trim() || taking || gated) return;
     setTaking(true);
     setRunMsg(null);
     try {
@@ -529,6 +548,8 @@ function GoalGuideModal({
           progress, or run an action below.
         </p>
 
+        {gated && <ConnectModelPrompt className="mt-3" />}
+
         <div className="mt-4 rounded-xl border border-line bg-panel2 p-3">
           <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
             <Send size={14} className="text-brand" /> Take it on
@@ -549,7 +570,8 @@ function GoalGuideModal({
             <button
               type="button"
               onClick={takeOn}
-              disabled={!topicId || !primaryAgent || !takeInput.trim() || taking}
+              disabled={!topicId || !primaryAgent || !takeInput.trim() || taking || gated}
+              title={gated ? "Connect a model to activate your agents" : undefined}
               className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-bold text-bg disabled:opacity-50"
             >
               {taking ? (
@@ -573,8 +595,14 @@ function GoalGuideModal({
                   key={a}
                   type="button"
                   onClick={() => triggerAgent(a)}
-                  disabled={!topicId}
-                  title={topicId ? `Trigger ${prettyAgent(a)} for this topic` : undefined}
+                  disabled={!topicId || gated}
+                  title={
+                    gated
+                      ? "Connect a model to activate your agents"
+                      : topicId
+                        ? `Trigger ${prettyAgent(a)} for this topic`
+                        : undefined
+                  }
                   className="rounded-lg border border-line bg-panel2 px-2 py-1 text-[12px] text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:cursor-default disabled:hover:border-line disabled:hover:text-mut"
                 >
                   {prettyAgent(a)}
@@ -632,7 +660,8 @@ function GoalGuideModal({
                     <button
                       type="button"
                       onClick={() => runPrompt(p, i)}
-                      disabled={!topicId || !primaryAgent || runningPrompt !== null}
+                      disabled={!topicId || !primaryAgent || runningPrompt !== null || gated}
+                      title={gated ? "Connect a model to activate your agents" : undefined}
                       className="inline-flex items-center gap-1 rounded-md border border-[#1f3d2e] bg-[#0e1c16] px-2 py-1 text-[11.5px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-50"
                     >
                       {runningPrompt === i ? (
@@ -711,6 +740,11 @@ export function LivingReport({
   const nextSteps = overview?.recommended_next_steps ?? [];
   const achievements = overview?.recent_achievements ?? [];
 
+  // E6 gate: block every "run an agent" control until a model is connected
+  // (API key / OAuth credential, or the XTKRecall MCP entitlement). Fail-safe —
+  // `modelGated` is only true once we KNOW no model is connected.
+  const { blocked: modelGated } = useModelConnected(topicId);
+
   // Sections are individually collapsible; all open by default.
   const [openSet, setOpenSet] = useState<Set<string>>(new Set(SECTION_ORDER));
   const toggle = (key: string) =>
@@ -788,7 +822,7 @@ export function LivingReport({
   }
 
   async function invokeOrchestrator(intent: "run" | "plan" | "review") {
-    if (!topicId || accelBusy) return;
+    if (!topicId || accelBusy || modelGated) return;
     setAccelBusy(true);
     setAccelMsg(null);
     try {
@@ -822,6 +856,10 @@ export function LivingReport({
       setError("No project in context.");
       return;
     }
+    if (modelGated) {
+      setError("Connect a model to activate your agents.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -845,6 +883,9 @@ export function LivingReport({
 
   return (
     <div className="space-y-3 p-4">
+      {/* E6 gate: no model connected → prompt to connect one before any run. */}
+      {modelGated && <ConnectModelPrompt />}
+
       {/* Effort presets — each activates a task (confirmed in a cost modal).
           "Accelerate now" (to the left) invokes the orchestrator directly. */}
       <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -852,7 +893,8 @@ export function LivingReport({
           <button
             type="button"
             onClick={() => setAccelOpen((o) => !o)}
-            disabled={accelBusy}
+            disabled={accelBusy || modelGated}
+            title={modelGated ? "Connect a model to activate your agents" : undefined}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#1f3d2e] bg-[#0e1c16] px-2.5 py-1.5 text-[12px] font-semibold text-good transition-colors hover:brightness-125 disabled:opacity-60"
           >
             {accelBusy ? (
@@ -897,7 +939,9 @@ export function LivingReport({
             key={t.key}
             type="button"
             onClick={() => openTier(t)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-mut transition-colors hover:border-[#31384c] hover:text-ink"
+            disabled={modelGated}
+            title={modelGated ? "Connect a model to activate your agents" : undefined}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:opacity-50 disabled:hover:border-line disabled:hover:text-mut"
           >
             <t.Icon size={13} />
             {t.label}
@@ -919,6 +963,7 @@ export function LivingReport({
         agentStatuses={agentStatuses}
         onActivate={() => invokeOrchestrator("run")}
         activating={accelBusy}
+        gated={modelGated}
       />
 
       {/* Report sections (all collapsible): Recommended next steps → Cue Winslow →
@@ -932,7 +977,12 @@ export function LivingReport({
         {nextSteps.length > 0 ? (
           <div className="space-y-1.5">
             {nextSteps.map((s, i) => (
-              <NextStepCard key={s.id ?? i} step={s} topicId={topicId} />
+              <NextStepCard
+                key={s.id ?? i}
+                step={s}
+                topicId={topicId}
+                gated={modelGated}
+              />
             ))}
           </div>
         ) : (
@@ -1188,6 +1238,7 @@ export function LivingReport({
         <GoalGuideModal
           goal={activeGoal.goal}
           topicId={topicId}
+          gated={modelGated}
           onClose={() => setActiveGoal(null)}
           onToggleDone={() => {
             toggleGoal(activeGoal.cadence, activeGoal.goal.id);

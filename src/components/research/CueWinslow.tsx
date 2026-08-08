@@ -5,6 +5,8 @@ import { Mic, MicOff, Send, Loader2, CheckCircle2, Keyboard } from "lucide-react
 import { cytapi, type CueResult } from "@/lib/api";
 import { AGENT_DISPLAY_NAMES } from "@/lib/utils";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
+import { useModelConnected } from "@/hooks/useModelConnected";
+import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
 
 /** "social_media" -> "Social Media" (orchestrator -> "Winslow"). */
 function prettyAgent(name: string): string {
@@ -25,6 +27,10 @@ export function CueWinslow({ topicId }: { topicId?: string }) {
   const [result, setResult] = useState<CueResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // E6 gate: cueing Winslow invokes the orchestrator (an agent run), so it's
+  // blocked until a model is connected.
+  const { blocked: modelGated } = useModelConnected(topicId);
+
   const { supported, listening, interim, error: micError, toggle, stop } =
     useSpeechInput({
       // Each finalised phrase is appended to whatever is already in the field, so
@@ -35,7 +41,7 @@ export function CueWinslow({ topicId }: { topicId?: string }) {
 
   async function send() {
     const body = text.trim();
-    if (!topicId || !body || sending) return;
+    if (!topicId || !body || sending || modelGated) return;
     stop();
     setSending(true);
     setError(null);
@@ -60,6 +66,8 @@ export function CueWinslow({ topicId }: { topicId?: string }) {
         Tell Winslow what you want done — tap the mic and talk, or type it. He&apos;ll
         decide which agent should own it and drop it into their queue.
       </p>
+
+      {modelGated && <ConnectModelPrompt />}
 
       <div className="rounded-xl border border-line bg-panel2 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -130,7 +138,8 @@ export function CueWinslow({ topicId }: { topicId?: string }) {
           <button
             type="button"
             onClick={send}
-            disabled={!topicId || !text.trim() || sending}
+            disabled={!topicId || !text.trim() || sending || modelGated}
+            title={modelGated ? "Connect a model to activate your agents" : undefined}
             className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[13.5px] font-bold text-bg disabled:opacity-50"
           >
             {sending ? (
