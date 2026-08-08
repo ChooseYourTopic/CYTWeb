@@ -1407,6 +1407,30 @@ export const cytapi = {
       `/me/topics/${topicId}/prompts/${promptId}`,
     ),
 
+  // Grow an agent's profile: add a skill or a loop the owner defines. Both are
+  // owner-scoped writes to the standard-schema profile (the same source the
+  // agent-detail view reads back via `agentProfile`), so a refresh shows them.
+  // NOTE: these two CYTAPI endpoints are the correlated backend still to build —
+  // until they exist the calls 404 and the UI fails soft ("not yet available").
+  addAgentSkill: (
+    topicId: string | number,
+    agentType: string,
+    skill: { name: string; description?: string },
+  ) =>
+    client.post<{ agent: AgentProfile }>(
+      `/me/topics/${topicId}/agents/${agentType}/skills`,
+      skill,
+    ),
+  addAgentLoop: (
+    topicId: string | number,
+    agentType: string,
+    loop: { name: string; trigger: string; behavior: string },
+  ) =>
+    client.post<{ agent: AgentProfile }>(
+      `/me/topics/${topicId}/agents/${agentType}/loops`,
+      loop,
+    ),
+
   // Kick a one-off run of an agent for a topic. An optional prompt is sent as a
   // directive the agent addresses specifically ("Run this prompt" from a goal).
   agentTrigger: (
