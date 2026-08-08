@@ -35,6 +35,7 @@ import {
   type TopicGoal,
   type RecommendedStep,
   type TopicActivity,
+  type AgentStatus,
 } from "@/lib/api";
 
 /**
@@ -234,21 +235,49 @@ function prettyAgent(name: string): string {
  * (a gentle stall hint that points at how to kick it off). Without this a blank
  * dashboard is indistinguishable from a broken one.
  */
-function WorkStateBanner({ activity }: { activity?: TopicActivity }) {
-  const rawState = activity?.state ?? "idle";
-  const pending = activity?.pending ?? 0;
-  const running = activity?.running ?? 0;
-  const activeAgents = activity?.active_agents ?? 0;
+function WorkStateBanner({
+  activity,
+  agentStatuses,
+  onActivate,
+  activating,
+}: {
+  activity?: TopicActivity;
+  agentStatuses?: AgentStatus[];
+  onActivate?: () => void;
+  activating?: boolean;
+}) {
+  // Drive the banner off the SAME real agent-status data the KPI + lights use, so
+  // it can never claim "5 agents active" when the live data says otherwise. Fall
+  // back to the backend activity summary only before statuses have loaded.
+  const haveStatuses = (agentStatuses?.length ?? 0) > 0;
+  const isRunning = (st?: string | null) => {
+    const s = (st ?? "").toLowerCase();
+    return s === "running" || s === "in_progress";
+  };
+  const running = haveStatuses
+    ? agentStatuses!.filter((a) => isRunning(a.last_run_status)).length
+    : (activity?.running ?? 0);
+  const pending = haveStatuses
+    ? agentStatuses!.reduce((n, a) => n + (a.tasks_pending ?? 0), 0)
+    : (activity?.pending ?? 0);
+  const activeAgents = haveStatuses
+    ? agentStatuses!.filter(
+        (a) => isRunning(a.last_run_status) || (a.tasks_pending ?? 0) > 0,
+      ).length
+    : (activity?.active_agents ?? 0);
+  const hasEverRun = haveStatuses
+    ? agentStatuses!.some((a) => a.last_run_at || a.last_run_status)
+    : (activity?.state ?? "idle") !== "stalled";
 
-  // Don't claim the crew is "on it" (or work is queued) when nothing is actually
-  // live — no agent running, none active, nothing queued. Otherwise the banner
-  // contradicts the "0 agents active" KPI it sits next to. Fall back to the
-  // caught-up state so the signal matches the numbers.
+  // Real state, derived from live data — not the (possibly stale) backend field.
   const nothingLive = running === 0 && activeAgents === 0 && pending === 0;
-  const state =
-    (rawState === "working" || rawState === "queued") && nothingLive
+  const state: "working" | "queued" | "stalled" | "idle" = nothingLive
+    ? hasEverRun
       ? "idle"
-      : rawState;
+      : "stalled"
+    : running > 0 || activeAgents > 0
+      ? "working"
+      : "queued";
 
   const parts: string[] = [];
   if (activeAgents > 0)
@@ -275,29 +304,44 @@ function WorkStateBanner({ activity }: { activity?: TopicActivity }) {
     stalled: {
       cls: "border-line bg-panel2 text-mut",
       icon: <Rocket size={16} className="text-brand" />,
-      title: "Nothing has run yet",
-      body:
-        "Your team is standing by. Pick an effort level above, or hit " +
-        "“Accelerate now,” to get the crew started on this project.",
+      title: "No agents running yet",
+      body: "Your team is standing by — activate them to start working this project.",
     },
     idle: {
       cls: "border-line bg-panel2 text-mut",
       icon: <CheckCircle2 size={16} className="text-good" />,
       title: "All caught up — nothing running right now",
-      body:
-        "No work is in flight. Give the team a new direction or accelerate to " +
-        "push the project forward.",
+      body: "No work is in flight. Activate the crew to push the project forward.",
     },
   }[state];
+
+  // When nothing is genuinely live, offer a real button to kick the crew off
+  // (rather than a passive "hit accelerate" hint).
+  const showActivate = Boolean(onActivate) && nothingLive;
 
   return (
     <div
       className={`animate-rise flex items-start gap-2.5 rounded-[11px] border px-3.5 py-2.5 ${config.cls}`}
     >
       <span className="mt-0.5 shrink-0">{config.icon}</span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[13px] font-semibold">{config.title}</div>
         <div className="mt-0.5 text-[12.5px] text-mut">{config.body}</div>
+        {showActivate && (
+          <button
+            type="button"
+            onClick={onActivate}
+            disabled={activating}
+            className="cyt-gradient-bg mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-bg disabled:opacity-60"
+          >
+            {activating ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Rocket size={13} />
+            )}
+            Activate agents now
+          </button>
+        )}
       </div>
     </div>
   );
@@ -653,10 +697,12 @@ function GoalGuideModal({
 export function LivingReport({
   overview,
   topicId,
+  agentStatuses,
 }: {
   overview: TopicOverview | null;
   topicId?: string;
   loading?: boolean;
+  agentStatuses?: AgentStatus[];
 }) {
   const items = overview?.items ?? [];
   const valueProp = items.find((i) => i.id === "value-prop");
@@ -867,8 +913,13 @@ export function LivingReport({
         </div>
       )}
 
-      {/* Always-alive signal: queued / working / stalled / idle. */}
-      <WorkStateBanner activity={overview?.activity} />
+      {/* Always-alive signal: queued / working / stalled / idle — off real data. */}
+      <WorkStateBanner
+        activity={overview?.activity}
+        agentStatuses={agentStatuses}
+        onActivate={() => invokeOrchestrator("run")}
+        activating={accelBusy}
+      />
 
       {/* Report sections (all collapsible): Recommended next steps → Cue Winslow →
           Business profile → Value proposition (with earning-potential charts) →
