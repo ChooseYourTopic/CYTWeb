@@ -22,6 +22,7 @@ import {
   type XtkRecallStatus,
   type McpTokenStatus,
   type McpTokenMint,
+  type IntegrationConnection,
 } from "@/lib/api";
 import { INTEGRATIONS, type IntegrationDef } from "@/lib/integrations";
 
@@ -58,6 +59,19 @@ async function copyText(text: string): Promise<void> {
   } catch {
     // clipboard blocked — no-op (the value is still visible to select manually)
   }
+}
+
+/** Short human date for a connection/expiry timestamp (null-safe). */
+function fmtDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
 }
 
 /** A readonly value row with a copy button (endpoint / masked key). */
@@ -363,18 +377,26 @@ function XtkRecallModal({
   );
 }
 
-/** Connect modal: enter this service's token/secret key, or sign up to get one. */
+/**
+ * Connect modal — the full per-provider integration lifecycle:
+ *   register/connect (enter this service's token/secret key, or sign up to get
+ *   one), retokenize (rotate the key — either paste a freshly rotated key via
+ *   "Update connection", or the platform-side one-click "Rotate token" once its
+ *   backend endpoint ships), and deregister/disconnect (two-click inline confirm).
+ * When connected it shows a masked identifier + the connection date; the real
+ * secret is never rendered.
+ */
 function ConnectModal({
   integration,
   topicId,
-  connected,
+  connection,
   onClose,
   onSaved,
   onDisconnected,
 }: {
   integration: IntegrationDef;
   topicId?: string;
-  connected: boolean;
+  connection: IntegrationConnection | null;
   onClose: () => void;
   onSaved: (key: string) => void;
   onDisconnected: (key: string) => void;
@@ -382,6 +404,11 @@ function ConnectModal({
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Two-click inline confirm for deregister (mirrors the MCP-token revoke guard).
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+
+  const connected = !!connection;
+  const connectedOn = fmtDate(connection?.connected_at);
 
   const filled = integration.fields.some(
     (f) => (values[f.key] ?? "").trim() !== "",
@@ -399,7 +426,13 @@ function ConnectModal({
       }
       await cytapi.saveIntegration(topicId, integration.key, creds);
       onSaved(integration.key);
-      setMsg({ ok: true, text: `${integration.name} connected.` });
+      setValues({});
+      setMsg({
+        ok: true,
+        text: connected
+          ? `${integration.name} credentials rotated.`
+          : `${integration.name} connected.`,
+      });
     } catch {
       setMsg({ ok: false, text: "Couldn't save that — check the value and try again." });
     } finally {
@@ -417,6 +450,7 @@ function ConnectModal({
       onClose();
     } catch {
       setMsg({ ok: false, text: "Couldn't disconnect. Try again." });
+      setConfirmDisconnect(false);
     } finally {
       setBusy(false);
     }
@@ -460,10 +494,44 @@ function ConnectModal({
           </button>
         </div>
 
-        {/* Path 1 — enter your own token / secret key. */}
+        {/* Connected — masked identifier + connection date + rotate control. */}
+        {connected && (
+          <div className="mt-4 rounded-xl border border-line bg-panel2 p-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5 font-mono text-[13px] text-ink">
+                <ShieldCheck size={14} className="text-good" />
+                {connection?.masked_key ?? "•••• •••• connected"}
+              </span>
+              {connectedOn ? (
+                <span className="text-[12px] text-mut">Connected {connectedOn}</span>
+              ) : null}
+            </div>
+            <p className="mt-1.5 text-[11.5px] text-dim">
+              Your credential is stored encrypted and shown masked — rotate it to
+              swap in a fresh key, or disconnect to deregister this service.
+            </p>
+            <div className="mt-2.5 flex items-center gap-2">
+              {/* Retokenize — one-click platform-side rotation. Disabled until the
+                  per-integration rotate endpoint ships; the manual path below
+                  (paste a freshly rotated key → Update) works today. */}
+              <button
+                type="button"
+                disabled
+                title="One-click rotation isn't available yet — rotate the key in the provider, then paste it below and press Update."
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold text-dim opacity-60"
+              >
+                <RefreshCw size={13} /> Rotate token
+              </button>
+              <span className="text-[11px] text-dim">Not yet available</span>
+            </div>
+          </div>
+        )}
+
+        {/* Path 1 — enter your own token / secret key (register, or rotate in a new one). */}
         <div className="mt-4">
           <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
-            <KeyRound size={14} className="text-brand" /> Enter your credentials
+            <KeyRound size={14} className="text-brand" />
+            {connected ? "Rotate — paste a new key" : "Enter your credentials"}
           </div>
           <div className="grid gap-2.5">
             {integration.fields.map((f) => (
@@ -498,7 +566,7 @@ function ConnectModal({
               className="cyt-gradient-bg inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
             >
               {busy ? <Loader2 size={15} className="animate-spin" /> : null}
-              {connected ? "Update connection" : "Connect"}
+              {connected ? "Rotate key" : "Connect"}
             </button>
           </div>
           <p className="mt-2 text-[11.5px] text-dim">
@@ -506,26 +574,30 @@ function ConnectModal({
           </p>
         </div>
 
-        {/* Path 2 — request credentials: sign up for the service (referral link). */}
-        <div className="mt-5 rounded-xl border border-line bg-panel2 p-3.5">
-          <div className="text-[13px] font-semibold text-ink">
-            Don&apos;t have an account?
+        {/* Path 2 — request credentials: sign up for the service (referral link).
+            Only shown before registering — once connected the flow is rotate/disconnect. */}
+        {!connected && (
+          <div className="mt-5 rounded-xl border border-line bg-panel2 p-3.5">
+            <div className="text-[13px] font-semibold text-ink">
+              Don&apos;t have an account?
+            </div>
+            <p className="mt-0.5 text-[12px] text-mut">
+              Create one to get your {integration.name} token, then paste it above.
+            </p>
+            <a
+              href={integration.affiliateUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
+            >
+              Create a {integration.name} account <ExternalLink size={13} />
+            </a>
           </div>
-          <p className="mt-0.5 text-[12px] text-mut">
-            Create one to get your {integration.name} token, then paste it above.
-          </p>
-          <a
-            href={integration.affiliateUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
-          >
-            Create a {integration.name} account <ExternalLink size={13} />
-          </a>
-        </div>
+        )}
 
+        {/* Deregister — two-click inline confirm — plus any status message. */}
         {(connected || msg) && (
-          <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
             {msg ? (
               <span className={`text-[12.5px] ${msg.ok ? "text-good" : "text-bad"}`}>
                 {msg.text}
@@ -533,16 +605,31 @@ function ConnectModal({
             ) : (
               <span />
             )}
-            {connected && (
-              <button
-                type="button"
-                onClick={disconnect}
-                disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
-              >
-                <Trash2 size={13} /> Disconnect
-              </button>
-            )}
+            {connected &&
+              (confirmDisconnect ? (
+                <button
+                  type="button"
+                  onClick={disconnect}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a1a1a] bg-[#1c0e0e] px-3 py-1.5 text-[12.5px] font-semibold text-bad transition-colors disabled:opacity-60"
+                >
+                  {busy ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
+                  Confirm disconnect
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDisconnect(true)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
+                >
+                  <Trash2 size={13} /> Disconnect
+                </button>
+              ))}
           </div>
         )}
       </div>
@@ -891,7 +978,10 @@ function McpConnectModal({
  * a provisioned endpoint/key based on the owner's entitlement.
  */
 export function IntegrationsPanel({ topicId }: { topicId?: string }) {
-  const [connected, setConnected] = useState<Set<string>>(new Set());
+  // provider key → its connection status (masked identifier + connected_at).
+  const [connected, setConnected] = useState<Map<string, IntegrationConnection>>(
+    new Map(),
+  );
   const [active, setActive] = useState<IntegrationDef | null>(null);
   const [xtk, setXtk] = useState<XtkRecallStatus | null>(null);
   // "Work with your Claude" MCP token — per-user (account-level), not per-topic.
@@ -909,10 +999,10 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
       .topicIntegrations(topicId)
       .then((r) =>
         setConnected(
-          new Set(
+          new Map(
             r.connections
               .filter((c) => c.status === "connected")
-              .map((c) => c.provider),
+              .map((c) => [c.provider, c]),
           ),
         ),
       )
@@ -927,6 +1017,33 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Optimistic connection-map updates from the modals. saveIntegration returns
+  // no masked identifier, so a fresh connect stamps connected_at now and leaves
+  // masked_key null (a follow-up load() fills it if the backend provides one);
+  // an existing entry is preserved on re-save (rotate) so its date/mask persist.
+  const markConnected = useCallback((provider: string) => {
+    setConnected((prev) => {
+      const n = new Map(prev);
+      n.set(
+        provider,
+        prev.get(provider) ?? {
+          provider,
+          status: "connected",
+          connected_at: new Date().toISOString(),
+          masked_key: null,
+        },
+      );
+      return n;
+    });
+  }, []);
+  const markDisconnected = useCallback((provider: string) => {
+    setConnected((prev) => {
+      const n = new Map(prev);
+      n.delete(provider);
+      return n;
+    });
+  }, []);
 
   return (
     <div className="space-y-4 p-4">
@@ -976,8 +1093,10 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
         {INTEGRATIONS.map((i) => {
           const isXtk = i.key === XTKRECALL_KEY;
           const entitled = isXtk && !!xtk?.entitled;
+          const conn = connected.get(i.key) ?? null;
           // "On" = hosted add-on active, or a bring-your-own connection exists.
           const on = entitled || connected.has(i.key);
+          const connOn = fmtDate(conn?.connected_at);
           const label = entitled
             ? "Active"
             : isXtk && xtk && !xtk.entitled
@@ -1009,6 +1128,15 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-[12.5px] text-mut">{i.desc}</p>
+                {conn && !isXtk ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+                    <span className="inline-flex items-center gap-1 font-mono text-mut">
+                      <ShieldCheck size={11} className="text-good" />
+                      {conn.masked_key ?? "•••• connected"}
+                    </span>
+                    {connOn ? <span className="text-dim">· since {connOn}</span> : null}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setActive(i)}
@@ -1036,29 +1164,17 @@ export function IntegrationsPanel({ topicId }: { topicId?: string }) {
             byoConnected={connected.has(active.key)}
             onClose={() => setActive(null)}
             onStatus={setXtk}
-            onByoSaved={(k) => setConnected((prev) => new Set(prev).add(k))}
-            onByoDisconnected={(k) =>
-              setConnected((prev) => {
-                const n = new Set(prev);
-                n.delete(k);
-                return n;
-              })
-            }
+            onByoSaved={markConnected}
+            onByoDisconnected={markDisconnected}
           />
         ) : (
           <ConnectModal
             integration={active}
             topicId={topicId}
-            connected={connected.has(active.key)}
+            connection={connected.get(active.key) ?? null}
             onClose={() => setActive(null)}
-            onSaved={(k) => setConnected((prev) => new Set(prev).add(k))}
-            onDisconnected={(k) =>
-              setConnected((prev) => {
-                const n = new Set(prev);
-                n.delete(k);
-                return n;
-              })
-            }
+            onSaved={markConnected}
+            onDisconnected={markDisconnected}
           />
         ))}
 

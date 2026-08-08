@@ -1025,6 +1025,16 @@ export type McpTokenMint = {
   expires_at: string | null;
 };
 
+// Per-topic integration connection status — one connected provider. Secrets are
+// never returned; `masked_key` (when the backend provides it) is a display-only
+// masked identifier for the connected credential, never the secret itself.
+export type IntegrationConnection = {
+  provider: string;
+  status: string;
+  connected_at: string | null;
+  masked_key?: string | null;
+};
+
 // Bring-your-own AI credential — how the signed-in user's agent work bills to
 // their own account. Secrets are never returned; this is status only.
 export type AiCredential = {
@@ -1666,11 +1676,15 @@ export const cytapi = {
     }),
 
   // Per-topic integrations — connect a service with a token / secret key. The
-  // secret is stored encrypted server-side and never returned (status only).
+  // secret is stored encrypted server-side and never returned (status only). The
+  // optional `masked_key` is a display-only masked identifier (e.g. "sk_…4f2a")
+  // the backend MAY return so the UI can show which credential is connected —
+  // it renders only when present, so this stays backward-compatible until the
+  // backend populates it.
   topicIntegrations: (id: string | number) =>
-    client.get<{
-      connections: { provider: string; status: string; connected_at: string | null }[];
-    }>(`/me/topics/${id}/integrations`),
+    client.get<{ connections: IntegrationConnection[] }>(
+      `/me/topics/${id}/integrations`,
+    ),
   saveIntegration: (
     id: string | number,
     provider: string,
