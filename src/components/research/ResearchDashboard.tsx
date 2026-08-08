@@ -442,6 +442,7 @@ export function ResearchDashboard({
                 overview={overview}
                 loading={loading}
                 topicId={topicId}
+                agentStatuses={agentStatuses}
               />
             )}
             {active === "battlepass" && <BattlePassPanel topicId={topicId} />}
