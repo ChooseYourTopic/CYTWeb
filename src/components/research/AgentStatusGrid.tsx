@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { ArrowUpCircle, Loader2, Play } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowUpCircle, Loader2, Play, Plus, Search, X } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { cn, label, timeAgo } from "@/lib/utils";
 import {
@@ -9,6 +9,8 @@ import {
   type AgentStatus,
   type AgentDetail,
   type AgentProfile,
+  type AgentTeam,
+  type AvailableAgent,
   type PrioritizeResult,
 } from "@/lib/api";
 import { Dialog } from "@/components/research/ProgressiveCard";
@@ -67,6 +69,74 @@ export function AgentStatusGrid({
   const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // The topic's live roster + the inventory of agents available to add. Reused
+  // from the same endpoints the main Team tab drives, so the rail and the tab
+  // never disagree about who's on the team.
+  const [team, setTeam] = useState<AgentTeam | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [q, setQ] = useState("");
+  const [busyAdd, setBusyAdd] = useState<string | null>(null);
+
+  const loadTeam = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      setTeam(await cytapi.topicTeam(companyId));
+    } catch {
+      /* fail-soft: the fixed v1 crew still renders without the roster */
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    loadTeam();
+  }, [loadTeam]);
+
+  async function addAgent(type: string) {
+    if (!companyId || busyAdd) return;
+    setBusyAdd(type);
+    try {
+      setTeam(await cytapi.addTopicAgent(companyId, type));
+      setQ("");
+    } catch {
+      /* ignore — the row stays available to retry */
+    } finally {
+      setBusyAdd(null);
+    }
+  }
+
+  async function removeAgent(type: string) {
+    if (!companyId || busyAdd) return;
+    setBusyAdd(type);
+    try {
+      setTeam(await cytapi.removeTopicAgent(companyId, type));
+    } catch {
+      /* ignore */
+    } finally {
+      setBusyAdd(null);
+    }
+  }
+
+  // Removable flag per agent type (core agents can't be removed).
+  const removable = new Map<string, boolean>();
+  (team?.team ?? []).forEach((m) => removable.set(m.agent_type, m.removable));
+
+  // Display order: the fixed v1 crew first, then any extra agents the owner has
+  // added to this topic that aren't already in that base order.
+  const displayOrder = [
+    ...AGENT_ORDER,
+    ...(team?.team ?? [])
+      .map((m) => m.agent_type)
+      .filter((t) => !AGENT_ORDER.includes(t)),
+  ];
+
+  // Inventory to add, filtered by the search box (name or role).
+  const needle = q.trim().toLowerCase();
+  const available = (team?.available ?? []).filter(
+    (a) =>
+      !needle ||
+      label(a.agent_type).toLowerCase().includes(needle) ||
+      a.role.toLowerCase().includes(needle),
+  );
+
   async function open(id: string) {
     setOpenFor(id);
     setDetail(null);
@@ -108,37 +178,142 @@ export function AgentStatusGrid({
   return (
     <>
       <div className="flex flex-col gap-0.5 p-2">
-        {AGENT_ORDER.map((id) => {
-          const s = byType.get(id);
-          return (
+        {/* Add-agent control: pull a specialist from the topic's roster inventory. */}
+        {companyId && (
+          <div className="mb-1 border-b border-line pb-2">
             <button
-              key={id}
-              onClick={() => open(id)}
-              className="flex w-full items-center gap-2.5 rounded-[9px] px-2 py-2 text-left text-[13px] transition-colors hover:bg-panel2"
-              title={`Open ${label(id)}`}
+              onClick={() => {
+                setShowAdd((v) => !v);
+                setQ("");
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-[9px] px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
+                showAdd
+                  ? "bg-panel2 text-ink"
+                  : "text-brand hover:bg-panel2",
+              )}
+              title="Add an agent from your roster"
             >
-              <span
-                className={cn(
-                  "mt-0.5 h-2 w-2 shrink-0 self-start rounded-full",
-                  loading ? "bg-dim" : statusClass(s),
-                )}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">{label(id)}</span>
-                {s?.last_action && (
-                  <span className="block truncate text-[11px] text-dim">
-                    {s.last_action}
-                  </span>
-                )}
-              </span>
-              <span className="shrink-0 text-[12px] text-dim">
-                {s?.tasks_pending
-                  ? `${s.tasks_pending} queued`
-                  : s?.last_run_at
-                    ? `last commit ${timeAgo(s.last_run_at)}`
-                    : (AGENT_DESC[id] ?? "")}
-              </span>
+              {showAdd ? <X size={14} /> : <Plus size={14} />}
+              {showAdd ? "Close" : "Add agent"}
             </button>
+
+            {showAdd && (
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center gap-2 rounded-[9px] border border-line bg-panel2 px-2.5 py-1.5">
+                  <Search size={13} className="text-dim" />
+                  <input
+                    autoFocus
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search your roster by name or role…"
+                    className="w-full bg-transparent text-[12.5px] text-ink placeholder:text-dim focus:outline-none"
+                  />
+                  {q && (
+                    <button
+                      onClick={() => setQ("")}
+                      className="text-dim hover:text-ink"
+                      title="Clear"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {available.length === 0 ? (
+                    <p className="px-1 py-1 text-[12px] text-dim">
+                      {team == null
+                        ? "Loading your roster…"
+                        : q
+                          ? `No agents match “${q}”.`
+                          : "Every available agent is already on the team."}
+                    </p>
+                  ) : (
+                    available.map((a: AvailableAgent) => (
+                      <div
+                        key={a.agent_type}
+                        className="flex items-center justify-between gap-2 rounded-[9px] border border-dashed border-line bg-panel px-2.5 py-1.5"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-[12.5px] font-semibold text-ink">
+                            {label(a.agent_type)}
+                          </span>
+                          <span className="block truncate text-[11px] text-dim">
+                            {a.role}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => addAgent(a.agent_type)}
+                          disabled={busyAdd === a.agent_type}
+                          className="cyt-gradient-bg inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] font-bold text-bg disabled:opacity-60"
+                        >
+                          {busyAdd === a.agent_type ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <Plus size={11} />
+                          )}
+                          Add
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {displayOrder.map((id) => {
+          const s = byType.get(id);
+          const canRemove = removable.get(id) === true;
+          return (
+            <div
+              key={id}
+              className="group flex w-full items-center gap-2.5 rounded-[9px] px-2 py-2 text-[13px] transition-colors hover:bg-panel2"
+            >
+              <button
+                onClick={() => open(id)}
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                title={`Open ${label(id)}`}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 h-2 w-2 shrink-0 self-start rounded-full",
+                    loading ? "bg-dim" : statusClass(s),
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{label(id)}</span>
+                  {s?.last_action && (
+                    <span className="block truncate text-[11px] text-dim">
+                      {s.last_action}
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 text-[12px] text-dim">
+                  {s?.tasks_pending
+                    ? `${s.tasks_pending} queued`
+                    : s?.last_run_at
+                      ? `last commit ${timeAgo(s.last_run_at)}`
+                      : (AGENT_DESC[id] ?? team?.team.find((m) => m.agent_type === id)?.role ?? "")}
+                </span>
+              </button>
+              {canRemove && (
+                <button
+                  onClick={() => removeAgent(id)}
+                  disabled={busyAdd === id}
+                  title="Remove from team"
+                  className="shrink-0 rounded-md p-1 text-dim opacity-0 transition-opacity hover:text-bad group-hover:opacity-100 disabled:opacity-60"
+                >
+                  {busyAdd === id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <X size={12} />
+                  )}
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
