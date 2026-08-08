@@ -323,6 +323,21 @@ export function ModelsPanel() {
     setRequested((prev) => new Set(prev).add(name));
   }
 
+  // Prompt the user to activate an agent (connect a model) when none is
+  // connected yet — dismissible ("Maybe later"). Agents can't run without a
+  // registered model (API key, OAuth, or the XTKRecall MCP).
+  const [cred, setCred] = useState<AiCredential | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    cytapi.aiCredential
+      .get()
+      .then(setCred)
+      .catch(() => {})
+      .finally(() => setChecked(true));
+  }, []);
+  const needsActivation = checked && !cred?.connected && !dismissed;
+
   return (
     <div className="space-y-4 p-4">
       <div>
@@ -332,6 +347,39 @@ export function ModelsPanel() {
           are rolling out.
         </p>
       </div>
+
+      {needsActivation && (
+        <div className="flex items-start gap-3 rounded-2xl border border-[#223257] bg-brand/10 p-4">
+          <span className="mt-0.5 shrink-0 text-brand">
+            <Sparkles size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-bold text-ink">
+              Activate an agent to get started
+            </div>
+            <p className="mt-0.5 text-[12.5px] text-mut">
+              Your agents can&apos;t run until a model is connected. Register your
+              Anthropic key below — or connect via the XTKRecall MCP — to activate
+              your crew.
+            </p>
+            <button
+              type="button"
+              onClick={() => setDismissed(true)}
+              className="mt-2 inline-flex items-center rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-mut hover:text-ink"
+            >
+              Maybe later
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            title="Dismiss"
+            className="shrink-0 text-dim hover:text-ink"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <AnthropicCredentialCard />
 
