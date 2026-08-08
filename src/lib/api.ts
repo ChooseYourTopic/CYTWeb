@@ -1041,7 +1041,8 @@ export type AiCredential = {
   connected: boolean;
   auth_type: "api_key" | "oauth" | null;
   account_label: string | null;
-  status: "active" | "needs_reauth" | null;
+  status: "active" | "needs_reauth" | "insufficient_credit" | null;
+  status_message?: string | null;
   expires_at: string | null;
   last_validated_at: string | null;
   oauth_available: boolean;
