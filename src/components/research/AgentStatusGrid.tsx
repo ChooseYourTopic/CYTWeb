@@ -44,7 +44,11 @@ function statusClass(s: AgentStatus | undefined): string {
   if (!s || !s.last_run_status) return "bg-dim";
   if (s.last_run_status === "running" || s.last_run_status === "in_progress")
     return "bg-warn animate-pulse2 shadow-[0_0_0_3px_#f6c45322]";
-  if (s.last_run_status === "completed" || s.last_run_status === "success")
+  if (
+    s.last_run_status === "completed" ||
+    s.last_run_status === "success" ||
+    s.last_run_status === "succeeded"
+  )
     return "bg-good";
   if (s.last_run_status === "failed" || s.last_run_status === "error")
     return "bg-bad";

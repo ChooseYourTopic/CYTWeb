@@ -235,10 +235,20 @@ function prettyAgent(name: string): string {
  * dashboard is indistinguishable from a broken one.
  */
 function WorkStateBanner({ activity }: { activity?: TopicActivity }) {
-  const state = activity?.state ?? "idle";
+  const rawState = activity?.state ?? "idle";
   const pending = activity?.pending ?? 0;
   const running = activity?.running ?? 0;
   const activeAgents = activity?.active_agents ?? 0;
+
+  // Don't claim the crew is "on it" (or work is queued) when nothing is actually
+  // live — no agent running, none active, nothing queued. Otherwise the banner
+  // contradicts the "0 agents active" KPI it sits next to. Fall back to the
+  // caught-up state so the signal matches the numbers.
+  const nothingLive = running === 0 && activeAgents === 0 && pending === 0;
+  const state =
+    (rawState === "working" || rawState === "queued") && nothingLive
+      ? "idle"
+      : rawState;
 
   const parts: string[] = [];
   if (activeAgents > 0)
