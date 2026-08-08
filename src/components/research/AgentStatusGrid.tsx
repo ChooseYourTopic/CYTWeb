@@ -40,18 +40,37 @@ const AGENT_DESC: Record<string, string> = {
   code_generation: "builds the site",
 };
 
+// Real-time status legend (Tracy, 2026-08-08). Every light reflects the agent's
+// ACTUAL backend state — never invented:
+//   green  = healthy — steady when it last ran OK & is idle, pulsing while active
+//   yellow = paused
+//   blue   = user input needed (forward-ready: lights only once the backend emits
+//            such a status — no agent shows blue until that signal exists)
+//   red    = stopped / problem / error
+//   purple, orange = RESERVED for future statuses (not emitted yet)
+//   grey   = no run yet / unknown
 function statusClass(s: AgentStatus | undefined): string {
-  if (!s || !s.last_run_status) return "bg-dim";
-  if (s.last_run_status === "running" || s.last_run_status === "in_progress")
-    return "bg-warn animate-pulse2 shadow-[0_0_0_3px_#f6c45322]";
-  if (
-    s.last_run_status === "completed" ||
-    s.last_run_status === "success" ||
-    s.last_run_status === "succeeded"
-  )
+  const st = (s?.last_run_status ?? "").toLowerCase();
+  if (!st) return "bg-dim";
+  // Active now — green, pulsing.
+  if (st === "running" || st === "in_progress")
+    return "bg-good animate-pulse2 shadow-[0_0_0_3px_#22c55e22]";
+  // Ran OK, idle — steady green.
+  if (st === "succeeded" || st === "completed" || st === "success")
     return "bg-good";
-  if (s.last_run_status === "failed" || s.last_run_status === "error")
-    return "bg-bad";
+  // Paused — yellow.
+  if (st === "paused") return "bg-warn";
+  // User input needed — blue (forward-ready).
+  if (
+    st === "needs_input" ||
+    st === "awaiting_input" ||
+    st === "input_required" ||
+    st === "user_input_needed"
+  )
+    return "bg-[#3b82f6]";
+  // Stopped / problem — red.
+  if (st === "failed" || st === "error" || st === "stopped") return "bg-bad";
+  // Unmapped (e.g. 'blocked') stays neutral until assigned; purple/orange reserved.
   return "bg-dim";
 }
 
