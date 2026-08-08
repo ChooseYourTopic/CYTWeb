@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Mic, Shuffle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mic, Shuffle } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { cytapi } from "@/lib/api";
 import { TOPIC_CATALOG, WILDCARD_TOPICS } from "@/lib/topicIdeas";
@@ -27,6 +27,18 @@ const WORKFLOW_STAGES = [
   { label: "Invent", intent: "I want to invent " },
   { label: "Design", intent: "I want to design " },
   { label: "Run", intent: "I want to run " },
+] as const;
+
+// Each numbered start button gets its own vibrant, brand-friendly accent so the
+// 1/2/3/4 chooser reads as four distinct, inviting options (not a muted row).
+// Hues are drawn from the palette tokens (blue/purple/green/amber). Kept as
+// explicit hex so we can drive inline styles (Tailwind's JIT can't see runtime-
+// built class strings) for border / tint / number color.
+const STAGE_ACCENTS = [
+  { hex: "#6ea8fe", tint: "rgba(110, 168, 254, 0.14)" }, // Learn  → brand blue
+  { hex: "#8b7bff", tint: "rgba(139, 123, 255, 0.14)" }, // Invent → brand purple
+  { hex: "#3fd08a", tint: "rgba(63, 208, 138, 0.14)" }, // Design → green
+  { hex: "#f6c453", tint: "rgba(246, 196, 83, 0.14)" }, // Run    → amber
 ] as const;
 
 // Every intent prefix — used to detect + swap a leading phrase without nuking
@@ -168,36 +180,75 @@ export default function LandingPage() {
         </h1>
 
         {/* Guided build path — click a stage to drop that intent into the box. */}
-        <div
-          className="mt-6 flex flex-wrap items-center justify-center gap-2"
-          aria-label="Pick a starting intent: learn, invent, design, run"
-        >
-          {WORKFLOW_STAGES.map((stage, i) => {
-            const isActive = activeStage === stage.label;
-            return (
-              <div key={stage.label} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => pickStage(stage.intent)}
-                  aria-pressed={isActive}
-                  title={`Start with "${stage.intent.trim()}…"`}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                    isActive
-                      ? "border-transparent bg-brand/20 text-ink"
-                      : "border-line bg-panel2 text-mut hover:border-[#31384c] hover:text-ink"
-                  }`}
-                >
-                  <span className="cyt-gradient-text font-bold">{i + 1}</span>
-                  {stage.label}
-                </button>
-                {i < WORKFLOW_STAGES.length - 1 && (
-                  <span aria-hidden className="text-[12px] text-dim">
-                    ·
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        <div className="mt-6">
+          {/* Real, centered instruction directly above the 1/2/3/4 chooser. */}
+          <p className="mb-2.5 text-center text-[12px] font-bold uppercase tracking-[2px] text-mut">
+            Choose one
+          </p>
+
+          {/* Inward-pointing arrows bracket the four numbered start buttons so
+              the eye lands on them ("look here / choose from these"). Arrows are
+              decorative → aria-hidden. */}
+          <div
+            className="flex flex-wrap items-center justify-center gap-2 sm:gap-3"
+            aria-label="Pick a starting intent: learn, invent, design, run"
+          >
+            <ArrowRight
+              aria-hidden
+              size={28}
+              strokeWidth={2.5}
+              className="hidden shrink-0 text-brand sm:block"
+            />
+
+            {WORKFLOW_STAGES.map((stage, i) => {
+              const isActive = activeStage === stage.label;
+              const accent = STAGE_ACCENTS[i];
+              return (
+                <div key={stage.label} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => pickStage(stage.intent)}
+                    aria-pressed={isActive}
+                    title={`Start with "${stage.intent.trim()}…"`}
+                    style={{
+                      borderColor: accent.hex,
+                      backgroundColor: isActive ? accent.hex : accent.tint,
+                      color: isActive ? "#0b0d12" : undefined,
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-full border-2 px-5 py-2.5 text-[15px] font-semibold shadow-sm transition-colors ${
+                      isActive
+                        ? "text-bg"
+                        : "text-ink hover:brightness-110"
+                    }`}
+                  >
+                    <span
+                      className="grid h-6 w-6 place-items-center rounded-full text-[13px] font-extrabold"
+                      style={
+                        isActive
+                          ? { backgroundColor: "rgba(11, 13, 18, 0.18)", color: "#0b0d12" }
+                          : { backgroundColor: accent.hex, color: "#0b0d12" }
+                      }
+                    >
+                      {i + 1}
+                    </span>
+                    {stage.label}
+                  </button>
+                  {i < WORKFLOW_STAGES.length - 1 && (
+                    <span aria-hidden className="text-[12px] text-dim">
+                      ·
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+
+            <ArrowLeft
+              aria-hidden
+              size={28}
+              strokeWidth={2.5}
+              className="hidden shrink-0 text-brand sm:block"
+            />
+          </div>
         </div>
 
         <div className="mt-7">
@@ -277,10 +328,10 @@ export default function LandingPage() {
                 type="button"
                 onClick={shuffleTumbler}
                 aria-label="Shuffle idea options"
-                title="Shuffle for fresh ideas"
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel2 px-3 py-1.5 text-[12.5px] font-semibold text-mut transition-colors hover:border-[#31384c] hover:text-ink"
+                title="Surprise me — shuffle for fresh ideas"
+                className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-bg shadow-[0_8px_24px_-8px_rgba(139,123,255,0.7)] transition-transform hover:scale-[1.04]"
               >
-                <Shuffle size={14} strokeWidth={2.2} />
+                <Shuffle size={15} strokeWidth={2.6} />
                 Shuffle
               </button>
             </div>
