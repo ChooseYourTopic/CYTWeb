@@ -103,6 +103,17 @@ export function AgentStatusGrid({
   const [q, setQ] = useState("");
   const [busyAdd, setBusyAdd] = useState<string | null>(null);
 
+  // Top-level "Add skill" — import a skill onto any agent already on the team
+  // (the same profile skill the per-agent detail view teaches, surfaced here so
+  // the owner can equip skills without first opening an agent). Writes via
+  // addAgentSkill then refreshes the roster.
+  const [showAddSkill, setShowAddSkill] = useState(false);
+  const [skillAgent, setSkillAgent] = useState("");
+  const [skillName, setSkillName] = useState("");
+  const [skillDesc, setSkillDesc] = useState("");
+  const [skillBusy, setSkillBusy] = useState(false);
+  const [skillMsg, setSkillMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const loadTeam = useCallback(async () => {
     if (!companyId) return;
     try {
@@ -138,6 +149,37 @@ export function AgentStatusGrid({
       /* ignore */
     } finally {
       setBusyAdd(null);
+    }
+  }
+
+  // Friendly line when the correlated endpoint isn't live yet (404) vs a generic retry.
+  function softError(e: unknown): string {
+    if (e instanceof ApiError && e.status === 404)
+      return "Adding a skill isn't available yet — coming soon.";
+    return "Couldn't add the skill — please try again.";
+  }
+
+  async function addSkill() {
+    if (!companyId || !skillAgent || !skillName.trim() || skillBusy) return;
+    setSkillBusy(true);
+    setSkillMsg(null);
+    try {
+      await cytapi.addAgentSkill(companyId, skillAgent, {
+        name: skillName.trim(),
+        description: skillDesc.trim() || undefined,
+      });
+      setSkillName("");
+      setSkillDesc("");
+      setSkillMsg({
+        ok: true,
+        text: `Skill added to ${label(skillAgent)}.`,
+      });
+      // If that agent's detail is open, refresh its profile so the new skill shows.
+      if (openFor === skillAgent) await reloadProfile();
+    } catch (e) {
+      setSkillMsg({ ok: false, text: softError(e) });
+    } finally {
+      setSkillBusy(false);
     }
   }
 
@@ -204,25 +246,95 @@ export function AgentStatusGrid({
   return (
     <>
       <div className="flex flex-col gap-0.5 p-2">
-        {/* Add-agent control: pull a specialist from the topic's roster inventory. */}
+        {/* Quick add: pull a specialist from the roster (Add agent) OR equip a skill
+            onto any agent on the team (Add skill) — two paired entry points. */}
         {companyId && (
           <div className="mb-1 border-b border-line pb-2">
-            <button
-              onClick={() => {
-                setShowAdd((v) => !v);
-                setQ("");
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-[9px] px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
-                showAdd
-                  ? "bg-panel2 text-ink"
-                  : "text-brand hover:bg-panel2",
-              )}
-              title="Add an agent from your roster"
-            >
-              {showAdd ? <X size={14} /> : <Plus size={14} />}
-              {showAdd ? "Close" : "Add agent"}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setShowAdd((v) => !v);
+                  setShowAddSkill(false);
+                  setQ("");
+                }}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
+                  showAdd ? "bg-panel2 text-ink" : "text-brand hover:bg-panel2",
+                )}
+                title="Add an agent from your roster"
+              >
+                {showAdd ? <X size={14} /> : <Plus size={14} />}
+                {showAdd ? "Close" : "Add agent"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddSkill((v) => !v);
+                  setShowAdd(false);
+                  setSkillMsg(null);
+                  // Default the target to the first agent on the team.
+                  setSkillAgent((cur) => cur || displayOrder[0] || "");
+                }}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-2 py-1.5 text-[12.5px] font-semibold transition-colors",
+                  showAddSkill ? "bg-panel2 text-ink" : "text-brand hover:bg-panel2",
+                )}
+                title="Import a skill onto one of your agents"
+              >
+                {showAddSkill ? <X size={14} /> : <Plus size={14} />}
+                {showAddSkill ? "Close" : "Add skill"}
+              </button>
+            </div>
+
+            {showAddSkill && (
+              <div className="mt-2 space-y-2 rounded-[9px] border border-line bg-panel2 p-2.5">
+                <div className="text-[11px] uppercase tracking-wider text-dim">
+                  Import a skill onto an agent
+                </div>
+                <select
+                  value={skillAgent}
+                  onChange={(e) => setSkillAgent(e.target.value)}
+                  className="w-full rounded-[9px] border border-line bg-panel px-2.5 py-1.5 text-[12.5px] text-ink focus:outline-none"
+                >
+                  {displayOrder.map((id) => (
+                    <option key={id} value={id}>
+                      {label(id)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="w-full rounded-[9px] border border-line bg-panel px-2.5 py-1.5 text-[12.5px] text-ink placeholder:text-dim focus:outline-none"
+                  value={skillName}
+                  onChange={(e) => setSkillName(e.target.value)}
+                  placeholder="Skill name (e.g. Keyword research)"
+                />
+                <input
+                  className="w-full rounded-[9px] border border-line bg-panel px-2.5 py-1.5 text-[12.5px] text-ink placeholder:text-dim focus:outline-none"
+                  value={skillDesc}
+                  onChange={(e) => setSkillDesc(e.target.value)}
+                  placeholder="What it does (optional)"
+                />
+                <button
+                  type="button"
+                  onClick={addSkill}
+                  disabled={skillBusy || !skillName.trim() || !skillAgent}
+                  className="cyt-gradient-bg flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-bold text-bg disabled:opacity-60"
+                >
+                  {skillBusy ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Plus size={12} />
+                  )}
+                  Add skill
+                </button>
+                {skillMsg && (
+                  <div
+                    className={`text-[12px] ${skillMsg.ok ? "text-good" : "text-bad"}`}
+                  >
+                    {skillMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
 
             {showAdd && (
               <div className="mt-2 space-y-2">
