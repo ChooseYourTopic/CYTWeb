@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Flag } from "lucide-react";
+import { ArrowLeft, Plus, Flag, Rocket } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -117,9 +117,17 @@ export default function TopicRoadmapPage({
         >
           <ArrowLeft size={14} /> Back to topic
         </Link>
-        <h1 className="mt-3 flex items-center gap-2 text-[24px] font-bold tracking-[-0.4px]">
-          <Flag size={20} className="text-brand" /> Roadmap
-        </h1>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <h1 className="flex items-center gap-2 text-[24px] font-bold tracking-[-0.4px]">
+            <Flag size={20} className="text-brand" /> Roadmap
+          </h1>
+          <Link
+            href={`/topic/${params.id}/releases`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-mut transition-colors hover:text-ink"
+          >
+            <Rocket size={14} /> Release notes
+          </Link>
+        </div>
         <p className="mt-1 text-[14px] text-mut">
           The work queue your team drains in priority order. Winslow advances it
           every cycle — you check in and nudge.
