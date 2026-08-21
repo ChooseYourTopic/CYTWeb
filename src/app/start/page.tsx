@@ -54,13 +54,19 @@ const PLATFORMS: { key: SocialPlatform; label: string }[] = [
   { key: "x", label: "X (Twitter)" },
 ];
 
-/** The four friendly intents on the simplified view (the admin-landing style). */
+/** The four friendly intents on the simplified view (the admin-landing style):
+ *  numbered, color-coded pills. Selecting one drops "I want to <verb>" into the box. */
 const SIMPLE_INTENTS = [
-  { key: "learn", label: "Learn", icon: BookOpen },
-  { key: "invent", label: "Invent", icon: Lightbulb },
-  { key: "design", label: "Design", icon: Palette },
-  { key: "run", label: "Run", icon: Rocket },
+  { key: "learn", label: "Learn", verb: "learn", n: 1, color: "#3B82F6", icon: BookOpen },
+  { key: "invent", label: "Invent", verb: "invent", n: 2, color: "#8B5CF6", icon: Lightbulb },
+  { key: "design", label: "Design", verb: "design", n: 3, color: "#22C55E", icon: Palette },
+  { key: "run", label: "Run", verb: "run", n: 4, color: "#EAB308", icon: Rocket },
 ] as const;
+
+/** Strip a leading "I want to <verb> " so switching intents replaces just the verb. */
+function stripIntentPrefix(s: string): string {
+  return s.replace(/^\s*i want to\s+\w+\s*/i, "").trimStart();
+}
 
 function Choice<T extends string>({
   options,
@@ -116,7 +122,7 @@ export default function StartPage() {
   const [stage, setStage] = useState<string>("invent");
   const [topicMode, setTopicMode] = useState<TopicMode>("know");
   const [advStep, setAdvStep] = useState<"questions" | "topic">("questions");
-  const [simpleIntent, setSimpleIntent] = useState<string>("invent");
+  const [simpleIntent, setSimpleIntent] = useState<string>("");
 
   const {
     supported: micSupported,
@@ -136,6 +142,22 @@ export default function StartPage() {
     setError(null);
     const idea = rollRandomTopic(stage);
     if (idea) setTopic(idea);
+  }
+
+  // Simplified view: an intent drops "I want to <verb> …" into the box (replacing
+  // just the verb if one's already there); a suggestion APPENDS onto it.
+  function applyIntent(intent: { key: string; verb: string }) {
+    setSimpleIntent(intent.key);
+    const tail = stripIntentPrefix(topic).trim();
+    setTopic(tail ? `I want to ${intent.verb} ${tail}` : `I want to ${intent.verb} `);
+  }
+  function appendSuggestion(text: string) {
+    setTopic((prev) => (prev.trim() ? `${prev.replace(/\s+$/, "")} ${text}` : text));
+  }
+  function shuffleSimple() {
+    const idea = SIMPLE_IDEAS[Math.floor(Math.random() * SIMPLE_IDEAS.length)] ?? "";
+    const verb = SIMPLE_INTENTS.find((i) => i.key === simpleIntent)?.verb ?? "";
+    setTopic(verb ? `I want to ${verb} ${idea}` : idea);
   }
 
   // Leaving the gate: New to AI → the simple guided view; Veteran → the advanced flow.
@@ -245,22 +267,31 @@ export default function StartPage() {
           <div className="mt-6 text-[11px] font-semibold uppercase tracking-wider text-dim">
             Choose one
           </div>
-          <div className="mt-2 flex flex-wrap justify-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             {SIMPLE_INTENTS.map((it) => {
               const active = simpleIntent === it.key;
-              const Icon = it.icon;
               return (
                 <button
                   key={it.key}
                   type="button"
-                  onClick={() => setSimpleIntent(it.key)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors ${
-                    active
-                      ? "cyt-gradient-bg border-transparent text-bg"
-                      : "border-line bg-panel2 text-mut hover:text-ink"
-                  }`}
+                  onClick={() => applyIntent(it)}
+                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors"
+                  style={{
+                    borderColor: it.color,
+                    backgroundColor: active ? it.color : "transparent",
+                    color: active ? "#0b0f19" : "#e6e9f0",
+                  }}
                 >
-                  <Icon size={14} /> {it.label}
+                  <span
+                    className="grid h-5 w-5 place-items-center rounded-full text-[11px] font-extrabold"
+                    style={{
+                      backgroundColor: active ? "rgba(0,0,0,0.28)" : it.color,
+                      color: active ? "#ffffff" : "#0b0f19",
+                    }}
+                  >
+                    {it.n}
+                  </span>
+                  {it.label}
                 </button>
               );
             })}
@@ -282,10 +313,12 @@ export default function StartPage() {
                   type="button"
                   onClick={toggleMic}
                   aria-pressed={listening}
-                  aria-label={listening ? "Stop dictation" : "Tap to talk"}
-                  title={listening ? "Stop dictation" : "Tap to talk"}
-                  className={`shrink-0 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition-colors ${
-                    listening ? "text-bad" : "text-mut hover:text-ink"
+                  aria-label={listening ? "Stop recording" : "Tap to talk — start recording"}
+                  title={listening ? "Stop recording" : "Tap to talk — start recording"}
+                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-bold text-white transition-colors ${
+                    listening
+                      ? "animate-pulse bg-[#dc2626] hover:bg-[#b91c1c]"
+                      : "bg-[#F97316] hover:bg-[#ea6d0e]"
                   }`}
                 >
                   {listening ? <MicOff size={15} /> : <Mic size={15} />} Tap to talk
@@ -310,23 +343,25 @@ export default function StartPage() {
           <div className="mt-4 flex items-center justify-center gap-2">
             <button
               type="button"
-              onClick={() => setTopic(SIMPLE_IDEAS[Math.floor(Math.random() * SIMPLE_IDEAS.length)] ?? "")}
+              onClick={shuffleSimple}
               className="inline-flex items-center gap-1.5 rounded-full border border-line bg-panel2 px-3 py-1.5 text-[12px] font-semibold text-mut hover:text-ink"
             >
               <Shuffle size={13} /> Shuffle
             </button>
           </div>
 
-          <div className="mx-auto mt-5 flex max-w-[620px] flex-wrap justify-center gap-2">
-            {SIMPLE_IDEAS.slice(0, 5).map((idea) => (
+          <p className="mt-4 text-[12px] text-dim">
+            Tap an idea to add it to your sentence, then hit Start.
+          </p>
+          <div className="mx-auto mt-2 flex max-w-[620px] flex-wrap justify-center gap-2">
+            {SIMPLE_IDEAS.slice(0, 6).map((idea) => (
               <button
                 key={idea}
                 type="button"
-                onClick={() => start(idea)}
-                disabled={busy}
-                className="rounded-full border border-line bg-panel px-3 py-1.5 text-[12.5px] text-mut transition-colors hover:border-[#31384c] hover:text-ink disabled:opacity-60"
+                onClick={() => appendSuggestion(idea)}
+                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel px-3 py-1.5 text-[12.5px] text-mut transition-colors hover:border-[#31384c] hover:text-ink"
               >
-                {idea}
+                <Plus size={12} className="text-brand" /> {idea}
               </button>
             ))}
           </div>
