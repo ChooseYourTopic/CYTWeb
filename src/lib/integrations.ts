@@ -210,4 +210,31 @@ export const INTEGRATIONS: IntegrationDef[] = [
     affiliateUrl: "https://elevenlabs.io/",
     docsUrl: "https://elevenlabs.io/app/settings/api-keys",
   },
+  {
+    key: "lead_interlink",
+    name: "Lead Interlink",
+    category: "Marketing",
+    desc: "The Empire's marketing OS — done-for-you ad campaigns, short-form video, and leads for your topic. Powers the Ads page.",
+    color: "#2563EB",
+    initial: "LI",
+    fields: [
+      { key: "api_token", label: "Lead Interlink API token", placeholder: "li_…" },
+    ],
+    affiliateUrl: "https://leadinterlink.com/",
+    docsUrl: "https://leadinterlink.com/",
+  },
+  {
+    key: "salesforce",
+    name: "Salesforce",
+    category: "CRM",
+    desc: "Sync ad-driven leads into your Salesforce and pull CRM lead status back into the Ads page.",
+    color: "#00A1E0",
+    initial: "SF",
+    fields: [
+      { key: "instance_url", label: "Instance URL", placeholder: "https://yourorg.my.salesforce.com" },
+      { key: "access_token", label: "Access token", placeholder: "00D…" },
+    ],
+    affiliateUrl: "https://www.salesforce.com/",
+    docsUrl: "https://help.salesforce.com/",
+  },
 ];

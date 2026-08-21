@@ -1403,6 +1403,52 @@ export type RoadmapLedger = {
   };
 };
 
+/* ------------------------------ Ads page hub ------------------------------- */
+
+export type IntegrationHealth = {
+  ok: boolean;
+  mode: "mock" | "live";
+  detail: string;
+};
+
+export type AdCampaign = {
+  id: string;
+  name: string;
+  channel: string;
+  status: string;
+  daily_budget_usd?: number;
+  impressions?: number;
+  clicks?: number;
+  leads?: number;
+  simulated?: boolean;
+};
+
+export type AdLead = {
+  id: string;
+  name: string;
+  source?: string | null;
+  stage?: string;
+  status?: string | null;
+  company?: string | null;
+  value_usd?: number;
+  created_at?: string;
+  simulated?: boolean;
+};
+
+export type AdsHub = {
+  lead_interlink: {
+    health: IntegrationHealth;
+    connected: boolean;
+    campaigns: AdCampaign[];
+    leads: AdLead[];
+  };
+  salesforce: {
+    health: IntegrationHealth;
+    connected: boolean;
+    leads: AdLead[];
+  };
+};
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -1805,6 +1851,13 @@ export const cytapi = {
   topicIntegrations: (id: string | number) =>
     client.get<{ connections: IntegrationConnection[] }>(
       `/me/topics/${id}/integrations`,
+    ),
+
+  // Ads page hub — Lead Interlink campaigns/leads + Salesforce CRM leads.
+  adsHub: (id: string | number) => client.get<AdsHub>(`/me/topics/${id}/ads-hub`),
+  pushAdsContext: (id: string | number) =>
+    client.post<{ ok: boolean; simulated?: boolean }>(
+      `/me/topics/${id}/ads-hub/push-context`,
     ),
   saveIntegration: (
     id: string | number,
