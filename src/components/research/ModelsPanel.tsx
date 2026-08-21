@@ -20,7 +20,14 @@ import {
   type AiCredential,
   type AiProvider,
   type LadderRung,
+  type ProviderUsage,
 } from "@/lib/api";
+
+/** Format a USD cost compactly — sub-cent shows more precision. */
+function money(n: number): string {
+  if (!n) return "$0.00";
+  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+}
 
 type Model = {
   name: string;
@@ -73,7 +80,7 @@ function fmt(iso: string | null): string {
  * Lets the user register a key, replace it at any time, test it, or deactivate
  * it. Talks to /me/ai-credential; secrets are never returned by the API.
  */
-function AnthropicCredentialCard() {
+function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
   const [cred, setCred] = useState<AiCredential | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -221,6 +228,14 @@ function AnthropicCredentialCard() {
             </div>
           )}
 
+          {usage && (usage.connected || usage.total.runs > 0) && (
+            <div className="mt-1.5 text-[11.5px] text-dim">
+              Usage — today {money(usage.today.cost_usd)} · {usage.today.runs}{" "}
+              runs · {usage.today.tokens.toLocaleString()} tokens · all-time{" "}
+              {money(usage.total.cost_usd)}
+            </div>
+          )}
+
           {/* Register / replace key form */}
           {showForm ? (
             <div className="mt-3 space-y-2">
@@ -347,15 +362,18 @@ function AnthropicCredentialCard() {
 function ModelTile({
   model,
   connected,
+  usage,
   onConnected,
 }: {
   model: Model;
   connected?: boolean;
+  usage?: ProviderUsage;
   onConnected: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const supported = !!model.provider;
   const active = !!connected;
@@ -461,6 +479,51 @@ function ModelTile({
           >
             Coming soon
           </button>
+        )}
+
+        {/* Usage — our metered spend for this provider; click to expand. */}
+        {usage && (usage.connected || usage.total.runs > 0) && (
+          <div className="mt-2.5 rounded-lg border border-line bg-panel2">
+            <button
+              type="button"
+              onClick={() => setShowUsage((v) => !v)}
+              className="flex w-full items-center justify-between px-2.5 py-1.5 text-[12px] text-mut transition-colors hover:text-ink"
+            >
+              <span>
+                Usage — today {money(usage.today.cost_usd)} ·{" "}
+                {usage.today.runs} run{usage.today.runs === 1 ? "" : "s"}
+              </span>
+              {showUsage ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {showUsage && (
+              <div className="border-t border-line px-2.5 py-2 text-[11.5px] text-dim">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-mut">Spent</div>
+                    <div>today {money(usage.today.cost_usd)}</div>
+                    <div>all-time {money(usage.total.cost_usd)}</div>
+                  </div>
+                  <div>
+                    <div className="text-mut">Runs</div>
+                    <div>today {usage.today.runs}</div>
+                    <div>all-time {usage.total.runs}</div>
+                  </div>
+                  <div>
+                    <div className="text-mut">Tokens</div>
+                    <div>today {usage.today.tokens.toLocaleString()}</div>
+                    <div>all-time {usage.total.tokens.toLocaleString()}</div>
+                  </div>
+                </div>
+                <p className="mt-1.5">
+                  Metered from your runs — providers don&apos;t expose a live
+                  balance.{" "}
+                  {usage.status === "insufficient_credit"
+                    ? "This key is flagged out of credits."
+                    : `Status: ${usage.status ?? "—"}.`}
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {msg && (
@@ -595,6 +658,7 @@ export function ModelsPanel() {
   // registered model (API key, OAuth, or the XTKRecall MCP).
   const [cred, setCred] = useState<AiCredential | null>(null);
   const [ladder, setLadder] = useState<LadderRung[]>([]);
+  const [usage, setUsage] = useState<ProviderUsage[]>([]);
   const [checked, setChecked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const refresh = useCallback(() => {
@@ -607,12 +671,17 @@ export function ModelsPanel() {
       .list()
       .then((r) => setLadder(r.ladder))
       .catch(() => {});
+    cytapi.aiCredentials
+      .usage()
+      .then((r) => setUsage(r.providers))
+      .catch(() => {});
   }, []);
   useEffect(() => {
     refresh();
   }, [refresh]);
   const needsActivation = checked && !cred?.connected && !dismissed;
   const connectedProviders = new Set(ladder.map((r) => r.provider));
+  const usageByProvider = new Map(usage.map((u) => [u.provider, u]));
 
   return (
     <div className="space-y-4 p-4">
@@ -657,7 +726,7 @@ export function ModelsPanel() {
         </div>
       )}
 
-      <AnthropicCredentialCard />
+      <AnthropicCredentialCard usage={usageByProvider.get("anthropic")} />
 
       <ProviderLadder ladder={ladder} onChange={refresh} />
 
@@ -669,6 +738,7 @@ export function ModelsPanel() {
             key={m.name}
             model={m}
             connected={!!m.provider && connectedProviders.has(m.provider)}
+            usage={m.provider ? usageByProvider.get(m.provider) : undefined}
             onConnected={refresh}
           />
         ))}

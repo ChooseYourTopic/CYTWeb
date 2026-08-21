@@ -1039,6 +1039,18 @@ export type IntegrationConnection = {
 // their own account. Secrets are never returned; this is status only.
 export type AiProvider = "anthropic" | "openai" | "grok" | "gemini";
 
+/** Per-provider usage bucket (a window of runs). */
+export type UsageBucket = { runs: number; tokens: number; cost_usd: number };
+
+/** Per-provider usage: our metered spend (providers don't expose live balance). */
+export type ProviderUsage = {
+  provider: AiProvider;
+  connected: boolean;
+  status: string | null;
+  today: UsageBucket;
+  total: UsageBucket;
+};
+
 /** One rung of the provider ladder (a connected provider + its priority). */
 export type LadderRung = {
   provider: AiProvider;
@@ -1885,6 +1897,8 @@ export const cytapi = {
       }),
     disconnect: (provider: AiProvider) =>
       client.del<{ ladder: LadderRung[] }>(`/me/ai-credentials/${provider}`),
+    // Per-provider usage (spend/tokens/runs, today + all-time) for the Models tiles.
+    usage: () => client.get<{ providers: ProviderUsage[] }>("/me/ai-usage"),
   },
 
   // The signed-in user's own support tickets (filed here, worked in the portal).
