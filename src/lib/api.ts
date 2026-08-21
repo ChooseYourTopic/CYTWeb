@@ -1338,6 +1338,45 @@ export type TeamStatus = {
   roster: TeamRosterAgent[];
 };
 
+/* ------------------------------ Roadmap queue ------------------------------ */
+
+export type RoadmapStatus =
+  | "proposed"
+  | "in_progress"
+  | "in_review"
+  | "shipped"
+  | "archived";
+export type RoadmapChannel = "feature" | "support" | "access";
+
+/** One enhancement on the roadmap queue. */
+export type RoadmapEntry = {
+  id: number;
+  title: string;
+  description: string | null;
+  channel: RoadmapChannel;
+  status: RoadmapStatus;
+  priority: number; // 1 = highest / do first
+  source: string; // winslow | owner | analyst | promotion
+  task_id: number | null;
+  shipped_at: string | null;
+  release_note: string | null;
+  updated_at: string | null;
+};
+
+/** The topic's roadmap: the open queue (priority order), shipped history, next. */
+export type RoadmapLedger = {
+  queue: RoadmapEntry[];
+  shipped: RoadmapEntry[];
+  next: RoadmapEntry | null;
+  counts: {
+    open: number;
+    in_progress: number;
+    in_review: number;
+    shipped: number;
+    total: number;
+  };
+};
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -1644,6 +1683,35 @@ export const cytapi = {
     client.put<{ spend_cap_usd: number | null }>(`/me/topics/${id}/spend-cap`, {
       amount,
     }),
+  // Roadmap queue — the observable, priority-ordered ledger of feature
+  // enhancements the team works through. Winslow advances it during his cycles
+  // (reads it at boot as Markdown); the owner reads it here and can nudge: place
+  // an entry, reprioritize, or advance a status.
+  roadmap: (id: string | number) =>
+    client.get<RoadmapLedger>(`/me/topics/${id}/roadmap`),
+  placeRoadmapEntry: (
+    id: string | number,
+    entry: { title: string; description?: string; priority?: number },
+  ) => client.post<RoadmapEntry>(`/me/topics/${id}/roadmap`, entry),
+  reprioritizeRoadmapEntry: (
+    id: string | number,
+    entryId: number,
+    priority: number,
+  ) =>
+    client.put<RoadmapEntry>(`/me/topics/${id}/roadmap/${entryId}/priority`, {
+      priority,
+    }),
+  setRoadmapEntryStatus: (
+    id: string | number,
+    entryId: number,
+    status: RoadmapStatus,
+    release_note?: string,
+  ) =>
+    client.post<RoadmapEntry>(`/me/topics/${id}/roadmap/${entryId}/status`, {
+      status,
+      ...(release_note ? { release_note } : {}),
+    }),
+
   // Interactive per-topic goals (daily / weekly / monthly momentum steps).
   topicGoals: (id: string | number) =>
     client.get<{ goals: TopicGoals }>(`/me/topics/${id}/goals`),
