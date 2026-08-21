@@ -38,7 +38,7 @@ import { cytapi, type TopicOverview, type ViewMode } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, Pause, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, Pause, Play, Loader2, Flag, Zap } from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
 function RunModeBadge({
@@ -218,6 +218,24 @@ export function ResearchDashboard({
     }
   }
 
+  // "Start now" — activate Winslow (the orchestrator) for this topic. The first
+  // thing it does is trigger Winslow to plan the day; the crew fans out from there.
+  const [starting, setStarting] = useState(false);
+  const [started, setStarted] = useState(false);
+  async function startWinslow() {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await cytapi.agentTrigger("orchestrator", topicId);
+      setStarted(true);
+      refetch();
+    } catch {
+      // fail-soft — the button re-enables so it can be retried
+    } finally {
+      setStarting(false);
+    }
+  }
+
   // Real per-company financials (incl. AI spend) for the spend KPI tile.
   const { summary: finance } = useFinanceSummary(topicId, 20000, !paused);
 
@@ -375,12 +393,38 @@ export function ResearchDashboard({
             </div>
           )}
         </div>
-        <div className="rounded-card border border-line bg-panel px-4 py-3 text-right">
-          <div className="text-[12px] uppercase tracking-wide text-mut">
-            Cycle
+        <div className="flex items-center gap-2">
+          {/* Start now → activate Winslow (orchestrator) for this topic. */}
+          <button
+            type="button"
+            onClick={startWinslow}
+            disabled={starting}
+            title="Activate Winslow — he plans the day and the crew fans out"
+            className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-bg transition-opacity disabled:opacity-60"
+          >
+            {starting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Zap size={14} strokeWidth={2.5} />
+            )}
+            {started ? "Winslow activated" : "Start now"}
+          </button>
+          {/* Roadmap → the topic's priority-ordered work queue. */}
+          <Link
+            href={`/topic/${topicId}/roadmap`}
+            title="This topic's roadmap — the work queue in priority order"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
+          >
+            <Flag size={14} />
+            <span className="hidden sm:inline">Roadmap</span>
+          </Link>
+          <div className="rounded-card border border-line bg-panel px-4 py-3 text-right">
+            <div className="text-[12px] uppercase tracking-wide text-mut">
+              Cycle
+            </div>
+            <div className="text-[18px] font-bold">Day {cycleDay}</div>
+            <div className="text-[12px] text-dim">{cyclePhase}</div>
           </div>
-          <div className="text-[18px] font-bold">Day {cycleDay}</div>
-          <div className="text-[12px] text-dim">{cyclePhase}</div>
         </div>
       </div>
 
