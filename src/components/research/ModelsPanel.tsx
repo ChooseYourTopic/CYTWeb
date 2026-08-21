@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { cytapi, ApiError, type AiCredential } from "@/lib/api";
+import { cytapi, ApiError, type AiCredential, type AiProvider } from "@/lib/api";
 
 type Model = {
   name: string;
@@ -20,16 +20,20 @@ type Model = {
   desc: string;
   color: string;
   initial: string;
+  // Set when this model has a LIVE provider adapter you can connect a key for.
+  // Absent = catalog-only (coming soon).
+  provider?: AiProvider;
+  keyHint?: string;
 };
 
-// The addressable catalog (Anthropic is handled separately — it powers the
-// agents today and has a live credential the user manages).
+// The addressable catalog. Anthropic is handled separately (the default provider,
+// its own card). OpenAI + Grok now have live adapters — connectable with a key.
 const MODELS: Model[] = [
-  { name: "OpenAI GPT", category: "LLM", desc: "GPT-5 and the GPT family.", color: "#10A37F", initial: "O" },
+  { name: "OpenAI GPT", category: "LLM", desc: "GPT-4o & the GPT family.", color: "#10A37F", initial: "O", provider: "openai", keyHint: "sk-…" },
+  { name: "xAI Grok", category: "LLM", desc: "Grok models from xAI.", color: "#111827", initial: "X", provider: "grok", keyHint: "xai-…" },
   { name: "Google Gemini", category: "LLM", desc: "Gemini Pro & Flash.", color: "#4285F4", initial: "G" },
   { name: "Meta Llama", category: "Open weight", desc: "Open-weight Llama models.", color: "#0668E1", initial: "L" },
   { name: "Mistral", category: "Open weight", desc: "Mistral & Mixtral models.", color: "#FF7000", initial: "M" },
-  { name: "xAI Grok", category: "LLM", desc: "Grok models from xAI.", color: "#111827", initial: "X" },
   { name: "DeepSeek", category: "Open weight", desc: "DeepSeek reasoning models.", color: "#4D6BFE", initial: "D" },
   { name: "Cohere", category: "LLM", desc: "Command models for enterprise.", color: "#39594D", initial: "C" },
 ];
@@ -326,29 +330,161 @@ function AnthropicCredentialCard() {
 }
 
 /**
- * Models tab — connect the AI models that power a project's agents. Claude runs
- * the agents today (a live, user-managed credential); the rest are a catalog for
- * v1 (per-model routing/credentials are the next layer).
+ * One alternate-provider tile. When the model has a LIVE adapter (openai/grok),
+ * Connect opens an inline key form and saves a provider-tagged credential — a real
+ * connection, not a placeholder. Others show "Coming soon". Note: one active
+ * provider credential at a time (the multi-provider priority ladder is next), so
+ * connecting here switches the account's active provider.
  */
-export function ModelsPanel() {
-  const [requested, setRequested] = useState<Set<string>>(new Set());
-  function connect(name: string) {
-    setRequested((prev) => new Set(prev).add(name));
+function ModelTile({
+  model,
+  activeProvider,
+  onConnected,
+}: {
+  model: Model;
+  activeProvider?: AiProvider;
+  onConnected: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const supported = !!model.provider;
+  const active = !!activeProvider && model.provider === activeProvider;
+
+  async function save() {
+    const k = keyInput.trim();
+    if (!k || busy || !model.provider) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await cytapi.aiCredential.saveApiKey(k, model.provider);
+      setKeyInput("");
+      setOpen(false);
+      setMsg({ ok: true, text: `${model.name} connected — it's now your active provider.` });
+      onConnected();
+    } catch (e) {
+      setMsg({ ok: false, text: serverMessage(e, "Couldn't save that key — check it and try again.") });
+    } finally {
+      setBusy(false);
+    }
   }
 
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4">
+      <span
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[14px] font-extrabold text-white"
+        style={{ backgroundColor: model.color }}
+      >
+        {model.initial}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[14px] font-bold text-ink">{model.name}</span>
+          <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
+            {model.category}
+          </span>
+          {active && (
+            <span className="rounded-full border border-[#1f3d2e] bg-[#0e1c16] px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-good">
+              Active
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-[12.5px] text-mut">{model.desc}</p>
+
+        {supported ? (
+          open ? (
+            <div className="mt-2.5 space-y-2">
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder={model.keyHint}
+                className="w-full rounded-lg border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:border-brand focus:outline-none"
+              />
+              <p className="text-[11px] text-dim">
+                Billed to your own {model.name} account. This becomes your active
+                provider, replacing the current one.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={busy || keyInput.trim().length < 20}
+                  className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-bold text-bg disabled:opacity-60"
+                >
+                  {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                  Connect
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setKeyInput("");
+                    setMsg(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[12px] text-mut hover:text-ink"
+                >
+                  <X size={12} /> Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(true);
+                setMsg(null);
+              }}
+              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-mut hover:text-ink"
+            >
+              {active ? <RefreshCw size={12} /> : <Plug size={12} />}
+              {active ? "Replace key" : "Connect"}
+            </button>
+          )
+        ) : (
+          <button
+            type="button"
+            disabled
+            title="Adapter on the way"
+            className="mt-2.5 inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-semibold text-dim opacity-60"
+          >
+            Coming soon
+          </button>
+        )}
+
+        {msg && (
+          <p className={`mt-2 text-[12px] ${msg.ok ? "text-good" : "text-bad"}`}>{msg.text}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Models tab — connect the AI models that power a project's agents. Anthropic is
+ * the default provider (its own card); OpenAI + Grok now connect with a key; the
+ * rest are catalog-only until their adapters ship.
+ */
+export function ModelsPanel() {
   // Prompt the user to activate an agent (connect a model) when none is
   // connected yet — dismissible ("Maybe later"). Agents can't run without a
   // registered model (API key, OAuth, or the XTKRecall MCP).
   const [cred, setCred] = useState<AiCredential | null>(null);
   const [checked, setChecked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  useEffect(() => {
+  const refresh = useCallback(() => {
     cytapi.aiCredential
       .get()
       .then(setCred)
       .catch(() => {})
       .finally(() => setChecked(true));
   }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
   const needsActivation = checked && !cred?.connected && !dismissed;
 
   return (
@@ -399,56 +535,20 @@ export function ModelsPanel() {
       <div className="pt-1 text-[12px] uppercase tracking-wider text-dim">More models</div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {MODELS.map((m) => {
-          const on = requested.has(m.name);
-          return (
-            <div
-              key={m.name}
-              className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4"
-            >
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[14px] font-extrabold text-white"
-                style={{ backgroundColor: m.color }}
-              >
-                {m.initial}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[14px] font-bold text-ink">{m.name}</span>
-                  <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
-                    {m.category}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[12.5px] text-mut">{m.desc}</p>
-                <button
-                  type="button"
-                  onClick={() => connect(m.name)}
-                  disabled={on}
-                  className={`mt-2.5 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                    on
-                      ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
-                      : "border-line text-mut hover:text-ink"
-                  }`}
-                >
-                  {on ? (
-                    <>
-                      <Check size={12} /> Requested
-                    </>
-                  ) : (
-                    <>
-                      <Plug size={12} /> Connect
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {MODELS.map((m) => (
+          <ModelTile
+            key={m.name}
+            model={m}
+            activeProvider={cred?.provider}
+            onConnected={refresh}
+          />
+        ))}
       </div>
 
       <p className="text-[12px] text-dim">
-        Requesting a model flags it for your project — connection and per-agent
-        routing are on the way.
+        Connect a provider with your own API key — it bills to your account. One
+        active provider at a time for now; a provider priority ladder that
+        auto-cascades when one runs out is on the way.
       </p>
     </div>
   );

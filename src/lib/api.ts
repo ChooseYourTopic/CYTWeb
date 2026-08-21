@@ -1037,8 +1037,11 @@ export type IntegrationConnection = {
 
 // Bring-your-own AI credential — how the signed-in user's agent work bills to
 // their own account. Secrets are never returned; this is status only.
+export type AiProvider = "anthropic" | "openai" | "grok";
+
 export type AiCredential = {
   connected: boolean;
+  provider?: AiProvider;
   auth_type: "api_key" | "oauth" | null;
   account_label: string | null;
   status: "active" | "needs_reauth" | "insufficient_credit" | null;
@@ -1842,9 +1845,10 @@ export const cytapi = {
   // user's agent usage runs on their own account.
   aiCredential: {
     get: () => client.get<AiCredential>("/me/ai-credential"),
-    saveApiKey: (apiKey: string) =>
+    saveApiKey: (apiKey: string, provider?: AiProvider) =>
       client.put<AiCredential>("/me/ai-credential/api-key", {
         api_key: apiKey,
+        ...(provider ? { provider } : {}),
       }),
     validate: () =>
       client.post<AiCredential & { ok: boolean; message: string }>(
