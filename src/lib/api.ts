@@ -1435,6 +1435,29 @@ export type AdLead = {
   simulated?: boolean;
 };
 
+export type CompetitorAd = {
+  advertiser: string;
+  copy: string;
+  since?: string | null;
+  simulated?: boolean;
+};
+
+export type KeywordIdea = {
+  keyword: string;
+  monthly_searches: number;
+  cpc_usd: number;
+  competition: string;
+  simulated?: boolean;
+};
+
+export type TrendSignal = {
+  term: string;
+  direction: string;
+  change_pct: number;
+  window: string;
+  simulated?: boolean;
+};
+
 export type AdsHub = {
   lead_interlink: {
     health: IntegrationHealth;
@@ -1446,6 +1469,12 @@ export type AdsHub = {
     health: IntegrationHealth;
     connected: boolean;
     leads: AdLead[];
+  };
+  intelligence: {
+    live: boolean;
+    competitor_ads: CompetitorAd[];
+    keywords: KeywordIdea[];
+    trends: TrendSignal[];
   };
 };
 

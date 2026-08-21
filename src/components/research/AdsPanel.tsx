@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Megaphone, Users, Plug, Loader2, ExternalLink } from "lucide-react";
+import {
+  Megaphone,
+  Users,
+  Plug,
+  ExternalLink,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+} from "lucide-react";
 import { SectionPanel } from "@/components/research/SectionPanel";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { useResearchStore } from "@/store/useResearchStore";
@@ -175,6 +184,86 @@ export function AdsPanel({ topicId }: { topicId: string }) {
               )}
             </div>
           </Card>
+
+          {/* Ad intelligence — competitor ads, keyword/CPC ideas, search trends. */}
+          {hub?.intelligence && (
+            <Card>
+              <CardHeader>
+                <span className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Search size={13} /> Ad intelligence
+                  </span>
+                  <span className="rounded-full border border-line bg-panel2 px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-mut">
+                    {hub.intelligence.live ? "Live" : "Simulated"}
+                  </span>
+                </span>
+              </CardHeader>
+              <div className="space-y-4 p-4">
+                <div>
+                  <div className="mb-1.5 text-[12px] font-semibold text-mut">
+                    Competitor ads running now
+                  </div>
+                  <div className="space-y-1.5">
+                    {hub.intelligence.competitor_ads.map((a, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg border border-line bg-panel2 px-3 py-2"
+                      >
+                        <div className="text-[12px] font-semibold text-ink">
+                          {a.advertiser}
+                        </div>
+                        <div className="text-[12px] text-mut">{a.copy}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 text-[12px] font-semibold text-mut">
+                    Keyword ideas · cost-per-click
+                  </div>
+                  <div className="space-y-1">
+                    {hub.intelligence.keywords.map((k, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px]"
+                      >
+                        <span className="text-ink">{k.keyword}</span>
+                        <span className="text-mut">
+                          {k.monthly_searches.toLocaleString()}/mo · $
+                          {k.cpc_usd.toFixed(2)} CPC · {k.competition}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 text-[12px] font-semibold text-mut">
+                    Search trends
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {hub.intelligence.trends.map((t, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2.5 py-1 text-[12px] text-mut"
+                      >
+                        {t.direction === "up" ? (
+                          <TrendingUp size={12} className="text-good" />
+                        ) : t.direction === "down" ? (
+                          <TrendingDown size={12} className="text-bad" />
+                        ) : (
+                          <Minus size={12} />
+                        )}
+                        {t.term}{" "}
+                        {t.change_pct > 0 ? `+${t.change_pct}%` : `${t.change_pct}%`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
 
           <a
             href="https://leadinterlink.com/"
