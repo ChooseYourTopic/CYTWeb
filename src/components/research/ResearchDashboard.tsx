@@ -38,7 +38,16 @@ import { cytapi, type TopicOverview, type ViewMode } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, Pause, Play, Loader2, Flag, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  Search,
+  Pause,
+  Play,
+  Loader2,
+  Flag,
+  Zap,
+  Ticket,
+} from "lucide-react";
 
 /** Live-vs-preview pill in the topic header. Links to Settings to switch. */
 function RunModeBadge({
@@ -417,6 +426,15 @@ export function ResearchDashboard({
           >
             <Flag size={14} />
             <span className="hidden sm:inline">Roadmap</span>
+          </Link>
+          {/* Tickets → the support desk: open a ticket, track updates, reopen. */}
+          <Link
+            href="/support"
+            title="Support tickets — open a ticket and review updates from a support agent"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
+          >
+            <Ticket size={14} />
+            <span className="hidden sm:inline">Tickets</span>
           </Link>
           <div className="rounded-card border border-line bg-panel px-4 py-3 text-right">
             <div className="text-[12px] uppercase tracking-wide text-mut">
