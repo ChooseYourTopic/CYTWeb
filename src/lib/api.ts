@@ -1689,6 +1689,8 @@ export const cytapi = {
   // an entry, reprioritize, or advance a status.
   roadmap: (id: string | number) =>
     client.get<RoadmapLedger>(`/me/topics/${id}/roadmap`),
+  // Public PRODUCT roadmap — ChooseYourTopic's own dev queue (platform scope).
+  platformRoadmap: () => client.get<RoadmapLedger>("/roadmap"),
   placeRoadmapEntry: (
     id: string | number,
     entry: { title: string; description?: string; priority?: number },

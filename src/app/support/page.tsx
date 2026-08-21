@@ -9,6 +9,8 @@ import {
   LifeBuoy,
   Send,
   MessageSquare,
+  Flag,
+  Rocket,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -228,6 +230,23 @@ export default function SupportPage() {
           Ask a question or report an issue — our support team picks these up and
           replies right here.
         </p>
+
+        {/* The ticketing hub: support tickets, the roadmap, and release notes are
+            one connected section. (Admin licensing / access lives here too.) */}
+        <nav className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/roadmap"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+          >
+            <Flag size={14} /> Roadmap
+          </Link>
+          <Link
+            href="/releases"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2 text-[13px] text-mut transition-colors hover:text-ink"
+          >
+            <Rocket size={14} /> Release notes
+          </Link>
+        </nav>
 
         {error && <p className="mt-4 text-[13px] text-bad">{error}</p>}
 
