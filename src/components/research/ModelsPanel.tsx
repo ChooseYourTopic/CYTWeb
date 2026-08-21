@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   Plug,
   Plus,
@@ -12,7 +14,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { cytapi, ApiError, type AiCredential, type AiProvider } from "@/lib/api";
+import {
+  cytapi,
+  ApiError,
+  type AiCredential,
+  type AiProvider,
+  type LadderRung,
+} from "@/lib/api";
 
 type Model = {
   name: string;
@@ -29,9 +37,9 @@ type Model = {
 // The addressable catalog. Anthropic is handled separately (the default provider,
 // its own card). OpenAI + Grok now have live adapters — connectable with a key.
 const MODELS: Model[] = [
+  { name: "Google Gemini", category: "LLM", desc: "Gemini 3.6 Flash — generous free tier.", color: "#4285F4", initial: "G", provider: "gemini", keyHint: "AIza… / AQ.…" },
   { name: "OpenAI GPT", category: "LLM", desc: "GPT-4o & the GPT family.", color: "#10A37F", initial: "O", provider: "openai", keyHint: "sk-…" },
   { name: "xAI Grok", category: "LLM", desc: "Grok models from xAI.", color: "#111827", initial: "X", provider: "grok", keyHint: "xai-…" },
-  { name: "Google Gemini", category: "LLM", desc: "Gemini Pro & Flash.", color: "#4285F4", initial: "G" },
   { name: "Meta Llama", category: "Open weight", desc: "Open-weight Llama models.", color: "#0668E1", initial: "L" },
   { name: "Mistral", category: "Open weight", desc: "Mistral & Mixtral models.", color: "#FF7000", initial: "M" },
   { name: "DeepSeek", category: "Open weight", desc: "DeepSeek reasoning models.", color: "#4D6BFE", initial: "D" },
@@ -338,11 +346,11 @@ function AnthropicCredentialCard() {
  */
 function ModelTile({
   model,
-  activeProvider,
+  connected,
   onConnected,
 }: {
   model: Model;
-  activeProvider?: AiProvider;
+  connected?: boolean;
   onConnected: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -350,7 +358,7 @@ function ModelTile({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const supported = !!model.provider;
-  const active = !!activeProvider && model.provider === activeProvider;
+  const active = !!connected;
 
   async function save() {
     const k = keyInput.trim();
@@ -464,15 +472,129 @@ function ModelTile({
 }
 
 /**
+ * The provider LADDER — every connected provider in priority order. The engine
+ * tries them top-first and cascades to the next when one runs out of credits.
+ * Reorder with the arrows; remove a rung with the trash icon.
+ */
+function ProviderLadder({
+  ladder,
+  onChange,
+}: {
+  ladder: LadderRung[];
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  if (ladder.length === 0) return null;
+
+  async function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (busy || j < 0 || j >= ladder.length) return;
+    const next = [...ladder];
+    [next[i], next[j]] = [next[j], next[i]];
+    setBusy(true);
+    try {
+      await cytapi.aiCredentials.reorder(next.map((r) => r.provider));
+      onChange();
+    } catch {
+      /* fail-soft */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(provider: AiProvider) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await cytapi.aiCredentials.disconnect(provider);
+      onChange();
+    } catch {
+      /* fail-soft */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-4">
+      <div className="text-[13px] font-bold text-ink">Provider ladder</div>
+      <p className="mt-0.5 text-[12px] text-mut">
+        Tried top-first. When one runs out of credits, your agents fall to the
+        next automatically.
+      </p>
+      <div className="mt-3 space-y-2">
+        {ladder.map((r, i) => (
+          <div
+            key={r.provider}
+            className="flex items-center gap-2 rounded-lg border border-line bg-panel2 px-3 py-2"
+          >
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-brand/10 text-[11px] font-bold text-brand">
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[13px] font-semibold capitalize text-ink">
+                  {r.provider}
+                </span>
+                {r.status === "insufficient_credit" ? (
+                  <span className="rounded-full border border-[#4a2020] bg-[#1c0e0e] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-bad">
+                    Out of credits
+                  </span>
+                ) : r.status === "active" ? (
+                  <span className="rounded-full border border-[#1f3d2e] bg-[#0e1c16] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-good">
+                    Active
+                  </span>
+                ) : null}
+              </div>
+              {r.account_label && (
+                <div className="text-[11px] text-dim">{r.account_label}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={busy || i === 0}
+              onClick={() => move(i, -1)}
+              title="Higher priority"
+              className="rounded p-1 text-mut hover:text-ink disabled:opacity-30"
+            >
+              <ChevronUp size={15} />
+            </button>
+            <button
+              type="button"
+              disabled={busy || i === ladder.length - 1}
+              onClick={() => move(i, 1)}
+              title="Lower priority"
+              className="rounded p-1 text-mut hover:text-ink disabled:opacity-30"
+            >
+              <ChevronDown size={15} />
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => remove(r.provider)}
+              title="Remove"
+              className="rounded p-1 text-mut hover:text-bad disabled:opacity-30"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Models tab — connect the AI models that power a project's agents. Anthropic is
- * the default provider (its own card); OpenAI + Grok now connect with a key; the
- * rest are catalog-only until their adapters ship.
+ * the default provider (its own card); OpenAI + Grok + Gemini connect with a key
+ * and form a cascade ladder; the rest are catalog-only until their adapters ship.
  */
 export function ModelsPanel() {
   // Prompt the user to activate an agent (connect a model) when none is
   // connected yet — dismissible ("Maybe later"). Agents can't run without a
   // registered model (API key, OAuth, or the XTKRecall MCP).
   const [cred, setCred] = useState<AiCredential | null>(null);
+  const [ladder, setLadder] = useState<LadderRung[]>([]);
   const [checked, setChecked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const refresh = useCallback(() => {
@@ -481,11 +603,16 @@ export function ModelsPanel() {
       .then(setCred)
       .catch(() => {})
       .finally(() => setChecked(true));
+    cytapi.aiCredentials
+      .list()
+      .then((r) => setLadder(r.ladder))
+      .catch(() => {});
   }, []);
   useEffect(() => {
     refresh();
   }, [refresh]);
   const needsActivation = checked && !cred?.connected && !dismissed;
+  const connectedProviders = new Set(ladder.map((r) => r.provider));
 
   return (
     <div className="space-y-4 p-4">
@@ -532,6 +659,8 @@ export function ModelsPanel() {
 
       <AnthropicCredentialCard />
 
+      <ProviderLadder ladder={ladder} onChange={refresh} />
+
       <div className="pt-1 text-[12px] uppercase tracking-wider text-dim">More models</div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -539,7 +668,7 @@ export function ModelsPanel() {
           <ModelTile
             key={m.name}
             model={m}
-            activeProvider={cred?.provider}
+            connected={!!m.provider && connectedProviders.has(m.provider)}
             onConnected={refresh}
           />
         ))}

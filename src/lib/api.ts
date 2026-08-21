@@ -1037,7 +1037,18 @@ export type IntegrationConnection = {
 
 // Bring-your-own AI credential — how the signed-in user's agent work bills to
 // their own account. Secrets are never returned; this is status only.
-export type AiProvider = "anthropic" | "openai" | "grok";
+export type AiProvider = "anthropic" | "openai" | "grok" | "gemini";
+
+/** One rung of the provider ladder (a connected provider + its priority). */
+export type LadderRung = {
+  provider: AiProvider;
+  priority: number;
+  auth_type: "api_key" | "oauth" | null;
+  account_label: string | null;
+  status: string | null;
+  status_message: string | null;
+  last_validated_at: string | null;
+};
 
 export type AiCredential = {
   connected: boolean;
@@ -1862,6 +1873,18 @@ export const cytapi = {
         code,
         state,
       }),
+  },
+
+  // Provider LADDER — every connected provider in priority order; the engine
+  // cascades down it on exhaustion. List, reorder, and remove a rung.
+  aiCredentials: {
+    list: () => client.get<{ ladder: LadderRung[] }>("/me/ai-credentials"),
+    reorder: (providers: AiProvider[]) =>
+      client.put<{ ladder: LadderRung[] }>("/me/ai-credentials/order", {
+        providers,
+      }),
+    disconnect: (provider: AiProvider) =>
+      client.del<{ ladder: LadderRung[] }>(`/me/ai-credentials/${provider}`),
   },
 
   // The signed-in user's own support tickets (filed here, worked in the portal).
