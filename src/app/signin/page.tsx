@@ -2,17 +2,40 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Smartphone, ShieldCheck, Mail } from "lucide-react";
+import { ArrowRight, Smartphone, ShieldCheck, Mail, Eye, EyeOff } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { cytapi } from "@/lib/api";
 
-/** Digits only; require a plausible phone length (7–15 per E.164). */
-function normalizePhone(raw: string): string {
-  return raw.replace(/[^\d+]/g, "");
+/**
+ * Country dialing codes for the sign-in selector. Kept short and NANP-first
+ * (the primary audience) with common internationals; "+" always yields E.164.
+ */
+const COUNTRY_CODES: { code: string; label: string; flag: string }[] = [
+  { code: "+1", label: "US/Canada", flag: "🇺🇸" },
+  { code: "+44", label: "UK", flag: "🇬🇧" },
+  { code: "+61", label: "Australia", flag: "🇦🇺" },
+  { code: "+52", label: "Mexico", flag: "🇲🇽" },
+  { code: "+91", label: "India", flag: "🇮🇳" },
+  { code: "+49", label: "Germany", flag: "🇩🇪" },
+  { code: "+33", label: "France", flag: "🇫🇷" },
+  { code: "+81", label: "Japan", flag: "🇯🇵" },
+  { code: "+55", label: "Brazil", flag: "🇧🇷" },
+  { code: "+63", label: "Philippines", flag: "🇵🇭" },
+];
+
+/**
+ * Combine a selected dialing code with the national digits into E.164. If the
+ * user typed their own "+…" we trust that verbatim and ignore the selector.
+ */
+function toE164(dialCode: string, raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("+")) return "+" + trimmed.replace(/\D/g, "");
+  const national = trimmed.replace(/\D/g, "");
+  return dialCode + national;
 }
-function isValidPhone(raw: string): boolean {
-  const d = raw.replace(/\D/g, "");
-  return d.length >= 7 && d.length <= 15;
+function isValidPhone(e164: string): boolean {
+  const d = e164.replace(/\D/g, "");
+  return d.length >= 8 && d.length <= 15;
 }
 
 /**
@@ -25,7 +48,9 @@ function isValidPhone(raw: string): boolean {
 export default function SignInPage() {
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
+  const [dialCode, setDialCode] = useState("+1");
   const [code, setCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -35,6 +60,28 @@ export default function SignInPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
+  // Dual-role chooser: shown after login when the account is BOTH staff (admin/
+  // support) AND a standard user with topics — "which view are you here for?".
+  const [roleChoice, setRoleChoice] = useState(false);
+
+  // After any successful sign-in, route by role: a dual-role account is asked
+  // which view; a staff-only account goes to the support portal; everyone else to
+  // their dashboard. Fail-soft: any hiccup lands on the dashboard.
+  async function afterAuth() {
+    try {
+      const me = await cytapi.me();
+      const staff = Boolean(me.is_staff || me.is_admin || me.is_support);
+      const hasTopics = (me.topics_count ?? 0) > 0;
+      if (staff && hasTopics) {
+        setRoleChoice(true);
+        setBusy(false);
+        return;
+      }
+      window.location.href = staff ? "/admin" : "/dashboard";
+    } catch {
+      window.location.href = "/dashboard";
+    }
+  }
 
   async function passwordSignIn() {
     if (busy) return;
@@ -46,7 +93,7 @@ export default function SignInPage() {
     setError(null);
     try {
       await cytapi.auth.passwordLogin(identifier.trim(), password);
-      window.location.href = "/dashboard";
+      await afterAuth();
     } catch {
       setError("Wrong email/nickname or password.");
       setBusy(false);
@@ -67,7 +114,7 @@ export default function SignInPage() {
         password,
         nickname: nickname.trim() || undefined,
       });
-      window.location.href = "/dashboard";
+      await afterAuth();
     } catch {
       setError("Couldn't create the account — that email may already be in use.");
       setBusy(false);
@@ -75,22 +122,27 @@ export default function SignInPage() {
   }
 
   async function sendCode() {
-    const value = normalizePhone(phone);
+    const value = toE164(dialCode, phone);
     if (busy) return;
     if (!isValidPhone(value)) {
-      setError("Enter a valid mobile number (include country code).");
+      setError("Enter a valid mobile number for the selected country.");
       return;
     }
     setBusy(true);
     setError(null);
     setNote(null);
     try {
-      await cytapi.auth.requestSmsCode(value);
+      const res = await cytapi.auth.requestSmsCode(value);
+      if (res && res.sent === false) {
+        setError("We couldn't send the text right now. Check the number or try again shortly.");
+        setBusy(false);
+        return;
+      }
       setNote("We texted a 6-digit code to your phone.");
-    } catch {
-      setNote("Auth backend isn't live yet — enter any 6 digits to preview.");
-    } finally {
       setStep("code");
+    } catch {
+      setError("We couldn't send the text right now. Please try again shortly.");
+    } finally {
       setBusy(false);
     }
   }
@@ -104,10 +156,9 @@ export default function SignInPage() {
     setBusy(true);
     setError(null);
     try {
-      await cytapi.auth.verifySmsCode(normalizePhone(phone), code);
+      await cytapi.auth.verifySmsCode(toE164(dialCode, phone), code);
       setNote("Verified. Signing you in…");
-      // The session cookie is set here; land the user on their own dashboard.
-      window.location.href = "/dashboard";
+      await afterAuth();
     } catch {
       setError("Couldn't verify — the auth backend isn't live yet.");
     } finally {
@@ -121,7 +172,48 @@ export default function SignInPage() {
 
       <section className="mx-auto mt-16 max-w-md">
         <div className="rounded-2xl border border-line bg-panel p-8 shadow-[0_20px_60px_-30px_#000]">
-          {emailMode ? (
+          {roleChoice ? (
+            <>
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
+                <ShieldCheck size={20} className="text-brand" />
+              </div>
+              <h1 className="text-[26px] font-bold tracking-[-0.5px]">
+                Welcome back
+              </h1>
+              <p className="mt-2 text-[14px] text-mut">
+                This account is both an admin and a user. Which view are you here
+                for?
+              </p>
+              <button
+                onClick={() => (window.location.href = "/dashboard")}
+                className="mt-6 flex w-full items-center justify-between rounded-xl border border-line bg-panel2 px-5 py-4 text-left transition-colors hover:border-[#31384c]"
+              >
+                <span>
+                  <span className="block text-[15px] font-bold text-ink">
+                    My topics
+                  </span>
+                  <span className="block text-[12.5px] text-mut">
+                    Your dashboard — run your own AI companies.
+                  </span>
+                </span>
+                <ArrowRight size={18} className="text-mut" />
+              </button>
+              <button
+                onClick={() => (window.location.href = "/admin")}
+                className="cyt-gradient-bg mt-3 flex w-full items-center justify-between rounded-xl px-5 py-4 text-left text-bg"
+              >
+                <span>
+                  <span className="block text-[15px] font-bold">
+                    Support desk
+                  </span>
+                  <span className="block text-[12.5px] opacity-80">
+                    The admin portal — work the support queue.
+                  </span>
+                </span>
+                <ArrowRight size={18} />
+              </button>
+            </>
+          ) : emailMode ? (
             <>
               <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
                 <Mail size={20} className="text-brand" />
@@ -168,21 +260,32 @@ export default function SignInPage() {
               <label className="mt-4 block text-[12px] uppercase tracking-wider text-dim">
                 Password
               </label>
-              <input
-                type="password"
-                autoComplete={registering ? "new-password" : "current-password"}
-                className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    registering ? registerAccount() : passwordSignIn();
-                }}
-              />
+              <div className="relative mt-2">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={registering ? "new-password" : "current-password"}
+                  className="w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 pr-12 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      registering ? registerAccount() : passwordSignIn();
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 grid w-12 place-items-center text-dim transition-colors hover:text-ink"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
 
               <button
@@ -232,23 +335,37 @@ export default function SignInPage() {
               >
                 Mobile number
               </label>
-              <input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                autoFocus
-                className="mt-2 w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
-                placeholder="+1 (555) 123-4567"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") sendCode();
-                }}
-              />
+              <div className="mt-2 flex gap-2">
+                <select
+                  aria-label="Country code"
+                  className="rounded-xl border border-line bg-panel2 px-3 py-3.5 text-[15px] text-ink outline-none focus:border-[#31384c]"
+                  value={dialCode}
+                  onChange={(e) => setDialCode(e.target.value)}
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  autoFocus
+                  className="w-full rounded-xl border border-line bg-panel2 px-4 py-3.5 text-[15px] text-ink outline-none placeholder:text-dim focus:border-[#31384c]"
+                  placeholder="(555) 123-4567"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") sendCode();
+                  }}
+                />
+              </div>
               {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
 
               <button
@@ -288,7 +405,7 @@ export default function SignInPage() {
               </h1>
               <p className="mt-2 text-[14px] text-mut">
                 {note ?? "We texted a 6-digit code to"}{" "}
-                <span className="text-ink">{phone}</span>.
+                <span className="text-ink">{toE164(dialCode, phone)}</span>.
               </p>
 
               <label
