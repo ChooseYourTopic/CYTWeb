@@ -30,6 +30,7 @@ import { AdsPanel } from "@/components/research/AdsPanel";
 import { BuildPanel } from "@/components/research/BuildPanel";
 import { MediaPanel } from "@/components/research/MediaPanel";
 import { InvoicingPanel } from "@/components/research/InvoicingPanel";
+import { NextStepsPanel } from "@/components/research/NextStepsPanel";
 import { ServicesPanel } from "@/components/research/ServicesPanel";
 import { InvestigationRail } from "@/components/research/InvestigationRail";
 import { useSectionData } from "@/hooks/useSectionData";
@@ -468,6 +469,7 @@ export function ResearchDashboard({
                   agentStatuses={agentStatuses}
                 />
               )}
+              {active === "next" && <NextStepsPanel topicId={topicId} />}
               {active === "battlepass" && <BattlePassPanel topicId={topicId} />}
               {active === "context" && <ContextPanel topicId={topicId} />}
               {active === "integrations" && (

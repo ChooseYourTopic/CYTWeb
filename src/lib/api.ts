@@ -333,7 +333,9 @@ export type SectionKey =
   // Invoicing (billing) + Services (professional service requests + one-click
   // subscribable services). Scaffold/interface pass; no backend section fetch yet.
   | "invoicing"
-  | "services";
+  | "services"
+  // NEXT — next steps/actions + decision-tree items waiting for the user.
+  | "next";
 
 // Sections fetched via GET /topic/{id}/{section} → SectionItem[].
 // (overview uses /overview, report uses /reports, decisions uses /tasks.)

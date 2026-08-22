@@ -6,6 +6,8 @@ import type { SectionKey } from "@/lib/api";
 
 export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "overview", label: "Overview" },
+  // NEXT sits right after Overview — next steps/actions + decisions waiting for you.
+  { key: "next", label: "NEXT" },
   { key: "battlepass", label: "Impact Pass" },
   { key: "context", label: "Context" },
   { key: "integrations", label: "Integrations" },
@@ -37,6 +39,7 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
  */
 export const CORE_SECTIONS: SectionKey[] = [
   "overview",
+  "next",
   "battlepass",
   "context",
   "integrations",
@@ -61,6 +64,7 @@ export const CORE_SECTIONS: SectionKey[] = [
  */
 export const BASIC_SECTIONS: SectionKey[] = [
   "overview",
+  "next", // NEXT — between Overview and Report
   "report", // "Reports"
   "team",
   "status",
