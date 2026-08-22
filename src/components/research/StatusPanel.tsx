@@ -3,6 +3,7 @@
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { label } from "@/lib/utils";
 import type { AgentStatus } from "@/lib/api";
+import { ContextDropInput } from "@/components/research/ContextDropInput";
 
 type Light = "green" | "orange" | "yellow" | "red" | "gray";
 
@@ -143,6 +144,9 @@ export function StatusPanel({ topicId }: { topicId: string }) {
           </span>
         ))}
       </div>
+
+      {/* Type or SPEAK context from this tab — drops onto the roadmap for Winslow. */}
+      <ContextDropInput topicId={topicId} area="Status" />
     </div>
   );
 }

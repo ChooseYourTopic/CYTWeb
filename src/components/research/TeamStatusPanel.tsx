@@ -10,6 +10,7 @@ import {
   type AgentRecord,
 } from "@/lib/api";
 import { label } from "@/lib/utils";
+import { ContextDropInput } from "@/components/research/ContextDropInput";
 import {
   Loader2,
   RefreshCw,
@@ -382,6 +383,9 @@ export function TeamStatusPanel({ topicId }: { topicId: string }) {
               ) : null}
             </div>
           </div>
+
+          {/* Type or SPEAK context about the team — drops onto the roadmap. */}
+          <ContextDropInput topicId={topicId} area="Team" />
         </>
       )}
     </div>

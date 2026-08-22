@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Rocket, Megaphone } from "lucide-react";
 import { SectionPanel } from "@/components/research/SectionPanel";
+import { ContextDropInput } from "@/components/research/ContextDropInput";
 
 /**
  * Release notes + roadmap content.
@@ -285,6 +286,9 @@ export function SupportPanel({ topicId }: { topicId: string }) {
             ))}
           </ul>
         </CollapsibleSection>
+
+        {/* Type or SPEAK a support note — drops onto the roadmap for Winslow. */}
+        <ContextDropInput topicId={topicId} area="Support" />
       </div>
     </div>
   );
