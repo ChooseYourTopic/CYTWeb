@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, ListChecks, Flag, Zap } from "lucide-react";
+import { ArrowRight, ListChecks, Flag, Zap, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { cytapi, type NextStep, type RoadmapEntry } from "@/lib/api";
 
 /**
@@ -50,6 +51,8 @@ function StatusBadge({ status }: { status: string }) {
 export function NextStepsPanel({ topicId }: { topicId: string }) {
   const [data, setData] = useState<NextStep | null>(null);
   const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +68,23 @@ export function NextStepsPanel({ topicId }: { topicId: string }) {
     load();
   }, [load]);
 
+  // Type or SPEAK a next step — it lands on the roadmap as a new entry, and the
+  // queue re-derives so it shows up as the next step or a recommended carry-over.
+  async function addStep() {
+    const title = draft.trim();
+    if (!title || adding) return;
+    setAdding(true);
+    try {
+      await cytapi.placeRoadmapEntry(topicId, { title });
+      setDraft("");
+      await load();
+    } catch {
+      /* fail-soft */
+    } finally {
+      setAdding(false);
+    }
+  }
+
   const current = data?.current ?? null;
   const recommended = data?.recommended ?? [];
 
@@ -76,6 +96,37 @@ export function NextStepsPanel({ topicId }: { topicId: string }) {
           The one step driving the project forward, plus the carry-overs worth
           prioritizing. The crew keeps moving on its own — this is what&apos;s next.
         </p>
+      </div>
+
+      {/* Type or SPEAK a next step — drops onto the roadmap. */}
+      <div className="rounded-2xl border border-line bg-panel p-4">
+        <div className="mb-2 text-[12px] uppercase tracking-wider text-dim">
+          Add a next step
+        </div>
+        <div className="flex items-start gap-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={2}
+            placeholder="What should happen next? Type it, or tap the mic and say it…"
+            className="min-h-[52px] w-full resize-y rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:outline-none"
+          />
+          <VoiceInputButton
+            onTranscript={(t) => setDraft((p) => (p ? `${p} ${t}` : t))}
+            title="Tap to talk — dictate a next step"
+          />
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={addStep}
+            disabled={!draft.trim() || adding}
+            className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-bold text-bg transition-opacity disabled:opacity-50"
+          >
+            {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Add to roadmap
+          </button>
+        </div>
       </div>
 
       {/* THE next step — always present once activated. */}
