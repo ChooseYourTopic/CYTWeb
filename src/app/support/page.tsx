@@ -13,6 +13,7 @@ import {
   Rocket,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import {
   cytapi,
   ApiError,
@@ -263,23 +264,41 @@ export default function SupportPage() {
               <span className="mb-1 block text-[12px] uppercase tracking-wider text-dim">
                 Subject
               </span>
-              <input
-                className="cyt-input"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g. My agents stopped mid-cycle"
-              />
+              <div className="flex items-start gap-2">
+                <input
+                  className="cyt-input"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="e.g. My agents stopped mid-cycle"
+                />
+                <VoiceInputButton
+                  size="sm"
+                  title="Dictate the subject"
+                  onTranscript={(text) =>
+                    setSubject((prev) => (prev ? `${prev} ${text}` : text))
+                  }
+                />
+              </div>
             </label>
             <label className="block">
               <span className="mb-1 block text-[12px] uppercase tracking-wider text-dim">
                 How can we help?
               </span>
-              <textarea
-                className="cyt-input min-h-[120px] resize-y"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Describe what you're seeing, and what you expected."
-              />
+              <div className="flex items-start gap-2">
+                <textarea
+                  className="cyt-input min-h-[120px] resize-y"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Describe what you're seeing, and what you expected."
+                />
+                <VoiceInputButton
+                  size="sm"
+                  title="Dictate your request"
+                  onTranscript={(text) =>
+                    setBody((prev) => (prev ? `${prev} ${text}` : text))
+                  }
+                />
+              </div>
             </label>
             {topics.length > 0 && (
               <label className="block">
@@ -363,12 +382,21 @@ export default function SupportPage() {
 
                 {thread.ticket.status !== "closed" && (
                   <div className="mt-4 border-t border-line pt-4">
-                    <textarea
-                      className="cyt-input min-h-[80px] resize-y"
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      placeholder="Write a reply…"
-                    />
+                    <div className="flex items-start gap-2">
+                      <textarea
+                        className="cyt-input min-h-[80px] resize-y"
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        placeholder="Write a reply…"
+                      />
+                      <VoiceInputButton
+                        size="sm"
+                        title="Dictate your reply"
+                        onTranscript={(text) =>
+                          setReply((prev) => (prev ? `${prev} ${text}` : text))
+                        }
+                      />
+                    </div>
                     <div className="mt-3">
                       <button
                         onClick={submitReply}

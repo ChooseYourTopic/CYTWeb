@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Image as ImageIcon,
   Film,
@@ -9,11 +9,10 @@ import {
   Share2,
   FileText,
   Wand2,
-  Mic,
-  Square,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import {
   MEDIA_CATALOG,
   MEDIA_BUCKETS,
@@ -91,59 +90,7 @@ function ProjectCard({
 
 export function MediaPanel() {
   const [idea, setIdea] = useState("");
-  const [listening, setListening] = useState(false);
-  const [micSupported, setMicSupported] = useState(false);
   const [picked, setPicked] = useState<MediaProject | null>(null);
-  const recRef = useRef<any>(null);
-
-  // Voice-capture front door — the browser SpeechRecognition API (like LI's Content Studio).
-  // Dictated text is appended to the idea; nothing leaves the device (it's transcribed locally).
-  useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    setMicSupported(true);
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.lang = "en-US";
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results)
-        .map((r: any) => r[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-      if (text) setIdea((prev) => (prev ? `${prev} ${text}` : text));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    return () => {
-      try {
-        rec.abort?.();
-      } catch {
-        /* noop */
-      }
-    };
-  }, []);
-
-  function toggleMic() {
-    const rec = recRef.current;
-    if (!rec) return;
-    if (listening) {
-      try {
-        rec.stop();
-      } catch {
-        /* noop */
-      }
-      setListening(false);
-      return;
-    }
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      setListening(false);
-    }
-  }
 
   const recommended = useMemo(
     () => (idea.trim() ? recommendProjects(idea) : []),
@@ -176,33 +123,17 @@ export function MediaPanel() {
             placeholder="e.g. A 30-second launch video and three Instagram posts for our new cold brew…"
             className="min-h-[72px] w-full resize-y rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:outline-none"
           />
-          <button
-            type="button"
-            onClick={toggleMic}
-            disabled={!micSupported}
-            aria-pressed={listening}
-            title={
-              micSupported
-                ? listening
-                  ? "Stop recording"
-                  : "Dictate your idea"
-                : "Voice input needs Chrome, Edge, or Safari"
+          <VoiceInputButton
+            onTranscript={(text) =>
+              setIdea((prev) => (prev ? `${prev} ${text}` : text))
             }
-            className={cn(
-              "flex h-10 w-10 flex-none items-center justify-center rounded-xl border transition-colors disabled:opacity-40",
-              listening
-                ? "animate-pulse border-bad/60 bg-bad/10 text-bad"
-                : "border-line text-mut hover:text-brand",
-            )}
-          >
-            {listening ? <Square size={15} /> : <Mic size={16} />}
-          </button>
+            title="Dictate your idea"
+          />
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2">
           <p className="text-[11px] text-dim">
-            {micSupported
-              ? "Tap the mic to talk it through, or type. We recommend the best projects for your idea."
-              : "Type your idea — voice capture needs Chrome, Edge, or Safari."}
+            Tap the orange mic to talk it through, or type. We recommend the best
+            projects for your idea.
           </p>
           {idea && (
             <button

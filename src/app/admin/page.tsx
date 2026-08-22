@@ -21,6 +21,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { AdminTwoFactorChallenge } from "@/components/security/TwoFactor";
 import {
   cytapi,
@@ -663,15 +664,24 @@ function TicketThreadPane({
 
       {/* Reply */}
       <div className="border-t border-line pt-3">
-        <textarea
-          className="cyt-input min-h-[76px] resize-y"
-          placeholder="Write a reply…"
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendReply();
-          }}
-        />
+        <div className="flex items-start gap-2">
+          <textarea
+            className="cyt-input min-h-[76px] resize-y"
+            placeholder="Write a reply…"
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendReply();
+            }}
+          />
+          <VoiceInputButton
+            size="sm"
+            title="Dictate your reply"
+            onTranscript={(text) =>
+              setReply((prev) => (prev ? `${prev} ${text}` : text))
+            }
+          />
+        </div>
         <div className="mt-2 flex items-center justify-between gap-3">
           <span className="text-[11px] text-dim">⌘/Ctrl + Enter to send</span>
           <button
