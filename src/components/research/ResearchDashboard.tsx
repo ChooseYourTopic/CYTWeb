@@ -497,9 +497,11 @@ export function ResearchDashboard({
         </div>
 
         {/* RIGHT: actions just below the top nav (Your topics / Resume),
-            then the investigation rail underneath. */}
+            then the investigation rail underneath. The lg:mt offset drops the
+            Start now / Roadmap / Tickets / Cycle stack down so the Cycle card
+            lines up with the Est. spend KPI tile on the left. */}
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 lg:mt-10">
             {/* Start now → activate Winslow (orchestrator) for this topic. */}
             <button
               type="button"
