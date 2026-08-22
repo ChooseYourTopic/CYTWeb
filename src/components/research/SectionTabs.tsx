@@ -53,15 +53,17 @@ export const CORE_SECTIONS: SectionKey[] = [
 ];
 
 /**
- * The essentials-only "Basic" view: the core research story with none of the
- * operational tabs. A strict subset of CORE_SECTIONS.
+ * The essentials-only "Basic" view. Curated set, rendered in this exact order
+ * (Basic renders in BASIC_SECTIONS order rather than SECTIONS order). Note
+ * "support" is not in CORE_SECTIONS, so it surfaces in Basic but not Standard.
  */
 export const BASIC_SECTIONS: SectionKey[] = [
   "overview",
-  "competitors",
-  "market",
-  "drafts",
-  "report",
+  "team",
+  "status",
+  "support",
+  "media",
+  "battlepass", // "Impact Pass"
 ];
 
 /**
@@ -79,7 +81,10 @@ export function SectionTabs() {
     viewMode === "advanced"
       ? SECTIONS
       : viewMode === "basic"
-        ? SECTIONS.filter((s) => BASIC_SECTIONS.includes(s.key))
+        ? BASIC_SECTIONS.flatMap((k) => {
+            const s = SECTIONS.find((x) => x.key === k);
+            return s ? [s] : [];
+          })
         : SECTIONS.filter((s) => CORE_SECTIONS.includes(s.key));
 
   return (
