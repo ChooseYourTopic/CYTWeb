@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Flag, Rocket } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Flag,
+  Rocket,
+  ChevronDown,
+  ChevronRight,
+  Users,
+} from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -21,6 +29,52 @@ const STATUS_META: Record<RoadmapStatus, { label: string; cls: string }> = {
   archived: { label: "Archived", cls: "bg-slate-100 text-slate-400" },
 };
 
+/**
+ * The specialists a roadmap entry can be farmed out to — the keys of the API's
+ * config/agents.php. The order is the assign-menu order.
+ */
+const AGENT_TYPES = [
+  "orchestrator",
+  "business_planning",
+  "competitor_research",
+  "social_media",
+  "finance",
+  "email_outreach",
+  "customer_support",
+  "ads_management",
+  "code_generation",
+  "winslow_prime",
+  "front_end_developer",
+  "back_end_developer",
+  "email_marketing_analyst",
+  "research_analyst",
+  "brand_designer",
+  "seo_specialist",
+  "copywriter",
+  "data_analyst",
+] as const;
+
+/** Hand-tuned human labels; anything else falls back to Title Case. */
+const AGENT_LABELS: Record<string, string> = {
+  unassigned: "Unassigned backlog",
+  orchestrator: "Orchestrator (Winslow)",
+  winslow_prime: "Winslow Prime",
+  front_end_developer: "Front-end Developer",
+  back_end_developer: "Back-end Developer",
+  seo_specialist: "SEO Specialist",
+  ads_management: "Ads Management",
+};
+
+function agentLabel(agentType: string): string {
+  return (
+    AGENT_LABELS[agentType] ??
+    agentType
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+  );
+}
+
 function StatusPill({ status }: { status: RoadmapStatus }) {
   const m = STATUS_META[status] ?? STATUS_META.proposed;
   return (
@@ -32,7 +86,46 @@ function StatusPill({ status }: { status: RoadmapStatus }) {
   );
 }
 
-function QueueRow({ entry }: { entry: RoadmapEntry }) {
+/**
+ * Inline assign menu on an entry — pick a specialist to farm it out to (or
+ * "Unassign" to return it to the backlog). Calls back with the agent_type (null
+ * to unassign); disabled while the ledger refetches.
+ */
+function AssignControl({
+  entry,
+  busy,
+  onAssign,
+}: {
+  entry: RoadmapEntry;
+  busy: boolean;
+  onAssign: (agentType: string | null) => void;
+}) {
+  return (
+    <select
+      aria-label="Assign to agent"
+      title="Assign this entry to a specialist"
+      value={entry.agent_type ?? ""}
+      disabled={busy}
+      onChange={(e) => onAssign(e.target.value === "" ? null : e.target.value)}
+      className="cyt-input h-7 w-[160px] shrink-0 text-[12px] disabled:opacity-40"
+    >
+      <option value="">Unassign</option>
+      {AGENT_TYPES.map((a) => (
+        <option key={a} value={a}>
+          {agentLabel(a)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function QueueRow({
+  entry,
+  control,
+}: {
+  entry: RoadmapEntry;
+  control?: React.ReactNode;
+}) {
   return (
     <div className="flex items-start gap-3 border-b border-line/60 px-4 py-3 last:border-b-0">
       <span
@@ -54,6 +147,65 @@ function QueueRow({ entry }: { entry: RoadmapEntry }) {
           </p>
         )}
       </div>
+      {control && <div className="shrink-0">{control}</div>}
+    </div>
+  );
+}
+
+/**
+ * One collapsible agent group in the drill-down: header shows the agent + its
+ * open/shipped/total rollup; expanded body is that agent's queue in order, each
+ * row carrying its own assign control so entries can be re-farmed live.
+ */
+function AgentGroup({
+  agentType,
+  bucket,
+  renderControl,
+  defaultOpen,
+}: {
+  agentType: string;
+  bucket: RoadmapLedger["by_agent"][string];
+  renderControl: (entry: RoadmapEntry) => React.ReactNode;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isBacklog = agentType === "unassigned";
+  return (
+    <div className="border-b border-line/60 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-panel2"
+      >
+        {open ? (
+          <ChevronDown size={15} className="shrink-0 text-mut" />
+        ) : (
+          <ChevronRight size={15} className="shrink-0 text-mut" />
+        )}
+        <span
+          className={`truncate text-[14px] font-semibold ${
+            isBacklog ? "text-mut" : "text-ink"
+          }`}
+        >
+          {agentLabel(agentType)}
+        </span>
+        <span className="ml-auto shrink-0 text-[11.5px] text-mut">
+          {bucket.counts.open} open · {bucket.counts.shipped} shipped ·{" "}
+          {bucket.counts.total} total
+        </span>
+      </button>
+      {open &&
+        (bucket.queue.length > 0 ? (
+          <div className="border-t border-line/60">
+            {bucket.queue.map((e) => (
+              <QueueRow key={e.id} entry={e} control={renderControl(e)} />
+            ))}
+          </div>
+        ) : (
+          <p className="border-t border-line/60 px-4 py-3 text-[13px] text-mut">
+            Nothing open here — everything assigned has shipped.
+          </p>
+        ))}
     </div>
   );
 }
@@ -69,6 +221,9 @@ export default function TopicRoadmapPage({
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState(3);
   const [placing, setPlacing] = useState(false);
+  // The entry id currently being (re)assigned, so its control disables while the
+  // ledger refetches.
+  const [assigningId, setAssigningId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -104,7 +259,46 @@ export default function TopicRoadmapPage({
     }
   }
 
+  // Farm an entry out to a specialist (or unassign with null), then refetch so it
+  // moves into that agent's queue live.
+  const assign = useCallback(
+    async (entryId: number, agentType: string | null) => {
+      setAssigningId(entryId);
+      try {
+        await cytapi.assignRoadmapEntry(params.id, entryId, agentType);
+        await load();
+      } catch {
+        /* fail-soft — keep the last-good ledger */
+      } finally {
+        setAssigningId(null);
+      }
+    },
+    [params.id, load],
+  );
+
+  const renderControl = useCallback(
+    (entry: RoadmapEntry) => (
+      <AssignControl
+        entry={entry}
+        busy={assigningId === entry.id}
+        onAssign={(agentType) => assign(entry.id, agentType)}
+      />
+    ),
+    [assign, assigningId],
+  );
+
   const counts = ledger?.counts;
+
+  // Order the drill-down: real agents first (config order), unassigned backlog last.
+  const byAgentKeys = ledger
+    ? Object.keys(ledger.by_agent).sort((a, b) => {
+        if (a === "unassigned") return 1;
+        if (b === "unassigned") return -1;
+        const ia = (AGENT_TYPES as readonly string[]).indexOf(a);
+        const ib = (AGENT_TYPES as readonly string[]).indexOf(b);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      })
+    : [];
 
   return (
     <main className="mx-auto max-w-[860px] px-6 pb-16">
@@ -201,7 +395,7 @@ export default function TopicRoadmapPage({
         ) : ledger && ledger.queue.length > 0 ? (
           <div>
             {ledger.queue.map((e) => (
-              <QueueRow key={e.id} entry={e} />
+              <QueueRow key={e.id} entry={e} control={renderControl(e)} />
             ))}
           </div>
         ) : (
@@ -210,6 +404,33 @@ export default function TopicRoadmapPage({
           </p>
         )}
       </Card>
+
+      {/* Drill-down: project → roadmap → agent → queue → deliverable. Reads the
+          stored per-agent slice; each row can be re-farmed to another specialist. */}
+      {ledger && byAgentKeys.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader>
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={13} /> By agent
+            </span>
+          </CardHeader>
+          <p className="px-4 pt-3 text-[12px] text-mut">
+            Each specialist&apos;s own queue, in priority order. Expand a group to
+            see its scope of work, or re-assign an entry to move it live.
+          </p>
+          <div className="mt-2">
+            {byAgentKeys.map((agentType, i) => (
+              <AgentGroup
+                key={agentType}
+                agentType={agentType}
+                bucket={ledger.by_agent[agentType]}
+                renderControl={renderControl}
+                defaultOpen={i === 0}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       {ledger && ledger.shipped.length > 0 && (
         <Card>
