@@ -94,6 +94,8 @@ export const client = {
     request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
@@ -1482,6 +1484,114 @@ export type AdsHub = {
   };
 };
 
+/* ------------------------------ Invoicing ---------------------------------- */
+
+export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
+
+/** One invoice row as the ledger presents it — money in integer cents (USD). */
+export type Invoice = {
+  id: number;
+  client_name: string;
+  client_email: string | null;
+  amount_cents: number;
+  status: InvoiceStatus;
+  overdue: boolean;
+  processor: string | null;
+  external_ref: string | null;
+  issued_at: string | null;
+  due_at: string | null;
+  paid_at: string | null;
+  updated_at: string | null;
+};
+
+/** The topic's invoicing ledger: outstanding-vs-paid totals + rows + processor mode. */
+export type InvoicingLedger = {
+  outstanding_cents: number;
+  paid_cents: number;
+  count: number;
+  invoices: Invoice[];
+  processor: IntegrationHealth;
+};
+
+/* ------------------------------- Services ---------------------------------- */
+
+export type ServiceCategory =
+  | "tax"
+  | "legal"
+  | "advertising"
+  | "training"
+  | "other";
+
+/** One professional-services request (describe work → fulfillment → results). */
+export type ServiceRequest = {
+  id: number;
+  category: ServiceCategory;
+  body: string;
+  status: string;
+  provider: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+/** A topic's subscription to a catalog service. */
+export type ServiceSubscription = {
+  id: number;
+  service_key: string;
+  provider: string | null;
+  status: string;
+  simulated: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+/** One catalog service — {connected, simulated, mode} derived from its adapter. */
+export type CatalogItem = {
+  key: string;
+  label: string;
+  blurb: string;
+  category: ServiceCategory;
+  connected: boolean;
+  simulated: boolean;
+  mode: "mock" | "live";
+};
+
+/** The Services hub in one call: open requests, subscriptions, and the catalog. */
+export type ServicesHub = {
+  requests: ServiceRequest[];
+  subscriptions: ServiceSubscription[];
+  catalog: CatalogItem[];
+};
+
+/* ------------------------------- Partners ---------------------------------- */
+
+/** The platform affiliate registration — a stable code + join link (D8). */
+export type AffiliateRegistration = {
+  id: number;
+  affiliate_code: string;
+  link: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+/** One referred-subscription attribution credited to the affiliate-of-record. */
+export type AffiliateAttribution = {
+  id: number;
+  company_id: number | null;
+  service_key: string;
+  provider: string | null;
+  status: string;
+  amount_cents: number | null;
+  created_at: string | null;
+};
+
+/** The Partners overview: registration (if any) + attributions + a rollup. */
+export type PartnersOverview = {
+  registration: AffiliateRegistration | null;
+  attributions: AffiliateAttribution[];
+  rollup: { count: number; recorded_cents: number };
+};
+
 export const cytapi = {
   // Landing → seed the company from one line.
   createTopic: (topic: string) =>
@@ -1905,6 +2015,50 @@ export const cytapi = {
     client.del<{ provider: string; status: string }>(
       `/me/topics/${id}/integrations/${provider}`,
     ),
+
+  // Invoicing ledger — outstanding/paid totals, rows, and the processor mode.
+  invoicing: (id: string | number) =>
+    client.get<InvoicingLedger>(`/me/topics/${id}/invoicing`),
+  createInvoice: (
+    id: string | number,
+    body: {
+      client_name: string;
+      client_email?: string;
+      amount_cents: number;
+      status?: InvoiceStatus;
+      due_at?: string;
+    },
+  ) => client.post<Invoice>(`/me/topics/${id}/invoicing`, body),
+  updateInvoice: (
+    id: string | number,
+    invoiceId: number,
+    body: { status: InvoiceStatus },
+  ) => client.patch<Invoice>(`/me/topics/${id}/invoicing/${invoiceId}`, body),
+
+  // Services hub — catalog + a topic's requests + subscriptions.
+  services: (id: string | number) =>
+    client.get<ServicesHub>(`/me/topics/${id}/services`),
+  submitServiceRequest: (
+    id: string | number,
+    body: { category: ServiceCategory; body: string },
+  ) => client.post<ServiceRequest>(`/me/topics/${id}/services/requests`, body),
+  subscribeService: (
+    id: string | number,
+    body: { service_key: string; provider?: string },
+  ) =>
+    client.post<ServiceSubscription>(`/me/topics/${id}/services/subscribe`, body),
+  // Unsubscribe soft-cancels then returns the refreshed hub.
+  unsubscribeService: (id: string | number, serviceKey: string) =>
+    client.del<ServicesHub>(
+      `/me/topics/${id}/services/subscribe/${serviceKey}`,
+    ),
+
+  // Partners — one-click affiliate registration + attribution overview (D8/D9).
+  partners: () => client.get<PartnersOverview>("/me/partners"),
+  // Register is idempotent and returns just the registration; refetch partners()
+  // for the full overview after.
+  registerPartner: () =>
+    client.post<AffiliateRegistration>("/me/partners/register"),
 
   // XTKRecall MCP paid add-on — the hosted vault. Status flips the Integrations
   // tile between "Subscribe" (not entitled) and manage/show-endpoint (entitled).

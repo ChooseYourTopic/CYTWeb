@@ -56,6 +56,9 @@ export function SiteHeader() {
             <Link href="/leaderboard" className={linkCls}>
               Leaderboard
             </Link>
+            <Link href="/partners" className={linkCls}>
+              Partners
+            </Link>
             <Link href="/settings" className={linkCls}>
               Settings
             </Link>
