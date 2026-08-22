@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ContextDropInput } from "@/components/research/ContextDropInput";
 import {
   cytapi,
   type InvoicingLedger,
@@ -297,6 +298,9 @@ export function InvoicingPanel({ topicId }: { topicId: string }) {
           </div>
         </>
       )}
+
+      {/* Type or SPEAK billing context — drops onto the roadmap for Winslow. */}
+      <ContextDropInput topicId={topicId} area="Invoicing" />
     </div>
   );
 }

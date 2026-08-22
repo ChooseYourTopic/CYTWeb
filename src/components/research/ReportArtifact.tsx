@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PanelShell } from "@/components/research/PanelShell";
 import { Dialog } from "@/components/research/ProgressiveCard";
+import { ContextDropInput } from "@/components/research/ContextDropInput";
 import { useSectionData } from "@/hooks/useSectionData";
 import { cytapi, type DailyReport } from "@/lib/api";
 
@@ -10,7 +11,7 @@ import { cytapi, type DailyReport } from "@/lib/api";
  * Report tab — browsable daily reports (morning plan + evening summary)
  * rendered as a readable/shareable artifact.
  */
-export function ReportArtifact() {
+export function ReportArtifact({ topicId }: { topicId: string }) {
   const { data, loading } = useSectionData<DailyReport[]>("report", () =>
     cytapi.reports(20),
   );
@@ -44,6 +45,11 @@ export function ReportArtifact() {
           </button>
         ))}
       </PanelShell>
+
+      {/* Type or SPEAK context on a report — drops onto the roadmap for Winslow. */}
+      <div className="px-4 pb-4">
+        <ContextDropInput topicId={topicId} area="Report" />
+      </div>
 
       {open && (
         <Dialog title={open.title} onClose={() => setOpen(null)}>

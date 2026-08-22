@@ -490,7 +490,7 @@ export function ResearchDashboard({
               {active === "build" && <BuildPanel topicId={topicId} />}
               {active === "finance" && <FinancePanel topicId={topicId} />}
               {active === "decisions" && <DecisionsPanel />}
-              {active === "report" && <ReportArtifact />}
+              {active === "report" && <ReportArtifact topicId={topicId} />}
               {active === "media" && <MediaPanel />}
               {active === "invoicing" && <InvoicingPanel topicId={topicId} />}
               {active === "services" && <ServicesPanel topicId={topicId} />}
