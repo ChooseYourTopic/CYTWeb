@@ -18,6 +18,7 @@ import {
   type ContextExtraction,
 } from "@/lib/api";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 
 const CATEGORY_OPTIONS = [
   "Food & Drink",
@@ -431,12 +432,24 @@ export function ContextPanel({ topicId }: { topicId: string }) {
         </div>
 
         <Field label="Goals" hint="What does success look like?">
-          <textarea
-            className="cyt-input min-h-[72px]"
-            value={ctx.goals ?? ""}
-            onChange={(e) => set("goals", e.target.value)}
-            placeholder="e.g. reach 100 paying customers in 90 days"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[72px]"
+              value={ctx.goals ?? ""}
+              onChange={(e) => set("goals", e.target.value)}
+              placeholder="e.g. reach 100 paying customers in 90 days"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate your goals"
+              onTranscript={(text) =>
+                setCtx((prev) => ({
+                  ...prev,
+                  goals: prev.goals ? `${prev.goals} ${text}` : text,
+                }))
+              }
+            />
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[12px] text-dim">Examples:</span>
             {SAMPLE_GOALS.map((g) => (
@@ -475,28 +488,68 @@ export function ContextPanel({ topicId }: { topicId: string }) {
         </Field>
 
         <Field label="Target market" hint="Who is this for?">
-          <textarea
-            className="cyt-input min-h-[60px]"
-            value={ctx.target_market ?? ""}
-            onChange={(e) => set("target_market", e.target.value)}
-            placeholder="e.g. event planners in the Chicago metro"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[60px]"
+              value={ctx.target_market ?? ""}
+              onChange={(e) => set("target_market", e.target.value)}
+              placeholder="e.g. event planners in the Chicago metro"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate your target market"
+              onTranscript={(text) =>
+                setCtx((prev) => ({
+                  ...prev,
+                  target_market: prev.target_market
+                    ? `${prev.target_market} ${text}`
+                    : text,
+                }))
+              }
+            />
+          </div>
         </Field>
         <Field label="Your competitor notes" hint="Rivals you already know of">
-          <textarea
-            className="cyt-input min-h-[60px]"
-            value={ctx.competitor_notes ?? ""}
-            onChange={(e) => set("competitor_notes", e.target.value)}
-            placeholder="Names, links, what they do well or poorly"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[60px]"
+              value={ctx.competitor_notes ?? ""}
+              onChange={(e) => set("competitor_notes", e.target.value)}
+              placeholder="Names, links, what they do well or poorly"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate your competitor notes"
+              onTranscript={(text) =>
+                setCtx((prev) => ({
+                  ...prev,
+                  competitor_notes: prev.competitor_notes
+                    ? `${prev.competitor_notes} ${text}`
+                    : text,
+                }))
+              }
+            />
+          </div>
         </Field>
         <Field label="Anything else" hint="Any other context the team should have">
-          <textarea
-            className="cyt-input min-h-[80px]"
-            value={ctx.notes ?? ""}
-            onChange={(e) => set("notes", e.target.value)}
-            placeholder="Constraints, brand voice, must-haves…"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[80px]"
+              value={ctx.notes ?? ""}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Constraints, brand voice, must-haves…"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate anything else"
+              onTranscript={(text) =>
+                setCtx((prev) => ({
+                  ...prev,
+                  notes: prev.notes ? `${prev.notes} ${text}` : text,
+                }))
+              }
+            />
+          </div>
         </Field>
       </div>
 

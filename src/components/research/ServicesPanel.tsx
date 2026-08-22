@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type KeyboardEvent,
 } from "react";
@@ -12,8 +11,6 @@ import {
   Send,
   Check,
   ArrowRight,
-  Mic,
-  Square,
   Plug,
   Loader2,
   Receipt,
@@ -23,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { useResearchStore } from "@/store/useResearchStore";
 import {
   cytapi,
@@ -90,9 +88,6 @@ export function ServicesPanel({ topicId }: { topicId: string }) {
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  const [micSupported, setMicSupported] = useState(false);
-  const recRef = useRef<any>(null);
   const setActive = useResearchStore((s) => s.setActiveSection);
 
   const load = useCallback(async () => {
@@ -108,58 +103,6 @@ export function ServicesPanel({ topicId }: { topicId: string }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  // Voice capture — the browser SpeechRecognition API (same front door as the
-  // Media creator). Dictated text is appended to the request; it's transcribed
-  // locally, nothing leaves the device.
-  useEffect(() => {
-    const SR =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    setMicSupported(true);
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.lang = "en-US";
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results)
-        .map((r: any) => r[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-      if (text) setRequest((prev) => (prev ? `${prev} ${text}` : text));
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    return () => {
-      try {
-        rec.abort?.();
-      } catch {
-        /* noop */
-      }
-    };
-  }, []);
-
-  function toggleMic() {
-    const rec = recRef.current;
-    if (!rec) return;
-    if (listening) {
-      try {
-        rec.stop();
-      } catch {
-        /* noop */
-      }
-      setListening(false);
-      return;
-    }
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      setListening(false);
-    }
-  }
 
   // Tab on an empty field autocompletes the example (like the /start suggestions).
   function onRequestKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -259,27 +202,12 @@ export function ServicesPanel({ topicId }: { topicId: string }) {
                 className="min-h-[68px] w-full resize-y rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:outline-none"
               />
               {/* Bright voice-record button — tap to talk, speech-to-text. */}
-              <button
-                type="button"
-                onClick={toggleMic}
-                disabled={!micSupported}
-                aria-pressed={listening}
-                title={
-                  micSupported
-                    ? listening
-                      ? "Stop recording"
-                      : "Tap to talk — dictate your request"
-                    : "Voice input needs Chrome, Edge, or Safari"
+              <VoiceInputButton
+                onTranscript={(text) =>
+                  setRequest((prev) => (prev ? `${prev} ${text}` : text))
                 }
-                className={cn(
-                  "flex h-10 w-10 flex-none items-center justify-center rounded-xl text-white shadow-sm transition-colors disabled:opacity-40",
-                  listening
-                    ? "animate-pulse bg-red-500"
-                    : "bg-orange-500 hover:bg-orange-400",
-                )}
-              >
-                {listening ? <Square size={15} /> : <Mic size={16} />}
-              </button>
+                title="Tap to talk — dictate your request"
+              />
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-[11px] text-dim">
               <kbd className="rounded border border-line bg-panel2 px-1.5 py-0.5 font-mono text-[10px] text-mut">

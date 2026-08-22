@@ -6,6 +6,7 @@ import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { useModelConnected } from "@/hooks/useModelConnected";
 import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
 import { cn, label, timeAgo } from "@/lib/utils";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import {
   cytapi,
   ApiError,
@@ -889,12 +890,21 @@ function AgentDetailView({
               onChange={(e) => setLoopTrigger(e.target.value)}
               placeholder="Trigger (e.g. Every Monday 9am)"
             />
-            <textarea
-              className="cyt-input min-h-[70px]"
-              value={loopBehavior}
-              onChange={(e) => setLoopBehavior(e.target.value)}
-              placeholder="Behavior — what the agent does each time"
-            />
+            <div className="flex items-start gap-2">
+              <textarea
+                className="cyt-input min-h-[70px]"
+                value={loopBehavior}
+                onChange={(e) => setLoopBehavior(e.target.value)}
+                placeholder="Behavior — what the agent does each time"
+              />
+              <VoiceInputButton
+                size="sm"
+                title="Dictate the loop behavior"
+                onTranscript={(text) =>
+                  setLoopBehavior((prev) => (prev ? `${prev} ${text}` : text))
+                }
+              />
+            </div>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1185,12 +1195,21 @@ function AgentDetailView({
           <div className="mb-2 text-[11px] uppercase tracking-wider text-dim">
             Add context for {label(agentType)}
           </div>
-          <textarea
-            className="cyt-input min-h-[110px]"
-            value={ctxText}
-            onChange={(e) => setCtxText(e.target.value)}
-            placeholder="Anything this agent should know — goals, constraints, tone…"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[110px]"
+              value={ctxText}
+              onChange={(e) => setCtxText(e.target.value)}
+              placeholder="Anything this agent should know — goals, constraints, tone…"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate context for this agent"
+              onTranscript={(text) =>
+                setCtxText((prev) => (prev ? `${prev} ${text}` : text))
+              }
+            />
+          </div>
           <div className="mt-2 flex items-center gap-3">
             <button
               type="button"
@@ -1253,12 +1272,21 @@ function AgentDetailView({
             </div>
           )}
 
-          <textarea
-            className="cyt-input min-h-[130px]"
-            value={realignText}
-            onChange={(e) => setRealignText(e.target.value)}
-            placeholder="Write a new system prompt to steer this agent. It replaces the built-in prompt (fail-safe: revert any time)."
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              className="cyt-input min-h-[130px]"
+              value={realignText}
+              onChange={(e) => setRealignText(e.target.value)}
+              placeholder="Write a new system prompt to steer this agent. It replaces the built-in prompt (fail-safe: revert any time)."
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate the new prompt"
+              onTranscript={(text) =>
+                setRealignText((prev) => (prev ? `${prev} ${text}` : text))
+              }
+            />
+          </div>
           <div className="mt-2 flex items-center gap-3">
             <button
               type="button"

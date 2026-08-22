@@ -13,6 +13,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { cytapi, type TopicGoals, type TopicGoal } from "@/lib/api";
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { ChestIcon } from "@/components/research/Chest";
 import { iconFor, frameFor } from "@/components/research/challengeIcons";
 import { ConnectModelPrompt } from "@/components/research/ConnectModelPrompt";
@@ -134,13 +135,22 @@ function GoalGuideModal({
             {primaryAgent ? prettyAgent(primaryAgent) : "your team"} to move this
             forward.
           </p>
-          <textarea
-            value={takeInput}
-            onChange={(e) => setTakeInput(e.target.value)}
-            rows={3}
-            placeholder="e.g. focus on the budget-conscious buyer, or: draft 3 launch posts…"
-            className="cyt-input w-full resize-y text-[13px]"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              value={takeInput}
+              onChange={(e) => setTakeInput(e.target.value)}
+              rows={3}
+              placeholder="e.g. focus on the budget-conscious buyer, or: draft 3 launch posts…"
+              className="cyt-input w-full resize-y text-[13px]"
+            />
+            <VoiceInputButton
+              size="sm"
+              title="Dictate your direction"
+              onTranscript={(text) =>
+                setTakeInput((prev) => (prev ? `${prev} ${text}` : text))
+              }
+            />
+          </div>
           <div className="mt-2 flex justify-end">
             <button
               type="button"
