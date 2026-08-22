@@ -327,7 +327,11 @@ export type SectionKey =
   | "security"
   // Media — the topic's generated creative output (images, clips, posts, ads).
   // Placeholder/scaffold for now; no backend section fetch yet.
-  | "media";
+  | "media"
+  // Invoicing (billing) + Services (professional service requests + one-click
+  // subscribable services). Scaffold/interface pass; no backend section fetch yet.
+  | "invoicing"
+  | "services";
 
 // Sections fetched via GET /topic/{id}/{section} → SectionItem[].
 // (overview uses /overview, report uses /reports, decisions uses /tasks.)

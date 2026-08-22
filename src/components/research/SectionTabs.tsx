@@ -27,6 +27,8 @@ export const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "security", label: "Security" },
   // Media is intentionally LAST — the bottom-right tab after Integrations et al.
   { key: "media", label: "Media" },
+  { key: "invoicing", label: "Invoicing" },
+  { key: "services", label: "Services" },
 ];
 
 /**
@@ -59,11 +61,14 @@ export const CORE_SECTIONS: SectionKey[] = [
  */
 export const BASIC_SECTIONS: SectionKey[] = [
   "overview",
+  "report", // "Reports"
   "team",
   "status",
+  "invoicing",
   "support",
   "media",
   "battlepass", // "Impact Pass"
+  "services",
 ];
 
 /**

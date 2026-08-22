@@ -29,6 +29,8 @@ import { SupportPanel } from "@/components/research/SupportPanel";
 import { AdsPanel } from "@/components/research/AdsPanel";
 import { BuildPanel } from "@/components/research/BuildPanel";
 import { MediaPanel } from "@/components/research/MediaPanel";
+import { InvoicingPanel } from "@/components/research/InvoicingPanel";
+import { ServicesPanel } from "@/components/research/ServicesPanel";
 import { InvestigationRail } from "@/components/research/InvestigationRail";
 import { useSectionData } from "@/hooks/useSectionData";
 import { useFinanceSummary } from "@/hooks/useFinanceSummary";
@@ -488,6 +490,8 @@ export function ResearchDashboard({
               {active === "decisions" && <DecisionsPanel />}
               {active === "report" && <ReportArtifact />}
               {active === "media" && <MediaPanel />}
+              {active === "invoicing" && <InvoicingPanel />}
+              {active === "services" && <ServicesPanel />}
             </div>
           </Card>
         </div>
