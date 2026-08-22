@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   Wrench,
   Wifi,
@@ -11,6 +11,8 @@ import {
   Send,
   Check,
   ArrowRight,
+  Mic,
+  Square,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,12 +48,81 @@ const REQUEST_CHIPS = [
   "Build me a landing page",
   "Run a local ad campaign",
   "File my LLC paperwork",
+  "Apply for financial assistance",
+  "Write grants",
+  "Inventory management",
 ];
+
+// The example the placeholder shows; Tab autocompletes it into the field.
+const REQUEST_EXAMPLE = "Set up my business email and connect it to the website";
 
 export function ServicesPanel() {
   const [request, setRequest] = useState("");
   const [sent, setSent] = useState(false);
   const [subscribed, setSubscribed] = useState<Record<string, boolean>>({});
+  const [listening, setListening] = useState(false);
+  const [micSupported, setMicSupported] = useState(false);
+  const recRef = useRef<any>(null);
+
+  // Voice capture — the browser SpeechRecognition API (same front door as the
+  // Media creator). Dictated text is appended to the request; it's transcribed
+  // locally, nothing leaves the device.
+  useEffect(() => {
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    setMicSupported(true);
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+    rec.onresult = (e: any) => {
+      const text = Array.from(e.results)
+        .map((r: any) => r[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      if (text) setRequest((prev) => (prev ? `${prev} ${text}` : text));
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    return () => {
+      try {
+        rec.abort?.();
+      } catch {
+        /* noop */
+      }
+    };
+  }, []);
+
+  function toggleMic() {
+    const rec = recRef.current;
+    if (!rec) return;
+    if (listening) {
+      try {
+        rec.stop();
+      } catch {
+        /* noop */
+      }
+      setListening(false);
+      return;
+    }
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  }
+
+  // Tab on an empty field autocompletes the example (like the /start suggestions).
+  function onRequestKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Tab" && !e.shiftKey && !request.trim()) {
+      e.preventDefault();
+      setRequest(REQUEST_EXAMPLE);
+    }
+  }
 
   function submitRequest() {
     if (!request.trim()) return;
@@ -82,13 +153,44 @@ export function ServicesPanel() {
           </div>
         ) : (
           <>
-            <textarea
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              rows={3}
-              placeholder="e.g. Set up my business email and connect it to the website…"
-              className="min-h-[68px] w-full resize-y rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:outline-none"
-            />
+            <div className="flex items-start gap-2">
+              <textarea
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+                onKeyDown={onRequestKeyDown}
+                rows={3}
+                placeholder={`e.g. ${REQUEST_EXAMPLE}…  (press Tab to autocomplete)`}
+                className="min-h-[68px] w-full resize-y rounded-xl border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:outline-none"
+              />
+              {/* Bright voice-record button — tap to talk, speech-to-text. */}
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={!micSupported}
+                aria-pressed={listening}
+                title={
+                  micSupported
+                    ? listening
+                      ? "Stop recording"
+                      : "Tap to talk — dictate your request"
+                    : "Voice input needs Chrome, Edge, or Safari"
+                }
+                className={cn(
+                  "flex h-10 w-10 flex-none items-center justify-center rounded-xl text-white shadow-sm transition-colors disabled:opacity-40",
+                  listening
+                    ? "animate-pulse bg-red-500"
+                    : "bg-orange-500 hover:bg-orange-400",
+                )}
+              >
+                {listening ? <Square size={15} /> : <Mic size={16} />}
+              </button>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-dim">
+              <kbd className="rounded border border-line bg-panel2 px-1.5 py-0.5 font-mono text-[10px] text-mut">
+                Tab
+              </kbd>
+              autocompletes the example · tap the orange mic to talk
+            </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {REQUEST_CHIPS.map((c) => (
                 <button
