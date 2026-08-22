@@ -1406,6 +1406,12 @@ export type RoadmapAgentBucket = {
 };
 
 /** The topic's roadmap: the open queue (priority order), shipped history, next. */
+/** The project's NEXT step (top of the roadmap queue) + recommended carry-overs. */
+export type NextStep = {
+  current: RoadmapEntry | null;
+  recommended: RoadmapEntry[];
+};
+
 export type RoadmapLedger = {
   queue: RoadmapEntry[];
   shipped: RoadmapEntry[];
@@ -1951,6 +1957,10 @@ export const cytapi = {
     client.post<RoadmapEntry>(`/me/topics/${id}/roadmap/${entryId}/assign`, {
       agent_type: agentType,
     }),
+  // The project's NEXT step (derived: the top open roadmap entry) + the recommended
+  // carry-overs beneath it. Always non-empty once Winslow has been activated.
+  nextStep: (id: string | number) =>
+    client.get<NextStep>(`/me/topics/${id}/next-step`),
 
   // Interactive per-topic goals (daily / weekly / monthly momentum steps).
   topicGoals: (id: string | number) =>

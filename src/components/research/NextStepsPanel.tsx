@@ -1,135 +1,154 @@
 "use client";
 
-import { useState } from "react";
-import {
-  GitBranch,
-  ArrowRight,
-  Check,
-  ListChecks,
-  CircleHelpIcon,
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowRight, ListChecks, Flag, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { cytapi, type NextStep, type RoadmapEntry } from "@/lib/api";
 
 /**
- * NEXT — the owner's on-the-loop surface: what's queued to happen next and any
- * decision-tree items waiting on YOU. The system keeps paving forward on its own;
- * this tab is where it surfaces the few forks that genuinely need your call, plus
- * the next steps/actions in flight. Interface pass — the decision + next-action
- * feed wires to the orchestrator's pending-decision + roadmap-next signals next.
+ * NEXT — the project's driver. The current NEXT STEP (the top of the roadmap queue)
+ * always sits here; it's what perpetually triggers Winslow and it's never empty once
+ * the project is activated. Beneath it, RECOMMENDED next steps: the carry-overs from
+ * earlier activity, still open in the queue, that analysis says to prioritize next.
+ * Live from the topic's derived next-step surface — it re-points itself the moment an
+ * agent finishes and its entry ships.
  */
 
-type Decision = {
-  id: string;
-  question: string;
-  detail: string;
-  options: string[];
+const STATUS_STYLE: Record<string, string> = {
+  proposed: "border-line bg-panel2 text-mut",
+  in_progress: "border-brand/40 bg-brand/10 text-brand",
+  in_review: "border-[#4a3b1a] bg-[#1c1708] text-warn",
+  shipped: "border-good/40 bg-good/10 text-good",
+  archived: "border-line bg-panel2 text-dim",
 };
 
-type NextAction = {
-  id: string;
-  label: string;
-  by: string;
-};
+function agentLabel(a: string | null): string {
+  if (!a) return "";
+  const special: Record<string, string> = {
+    front_end_developer: "Front-end Developer",
+    back_end_developer: "Back-end Developer",
+    seo_specialist: "SEO Specialist",
+    orchestrator: "Orchestrator (Winslow)",
+    winslow_prime: "Winslow Prime",
+  };
+  return special[a] ?? a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-// Illustrative seed content until the live pending-decision / roadmap-next feed
-// is wired — shows the shape of what lands here.
-const SAMPLE_DECISIONS: Decision[] = [];
-
-const SAMPLE_NEXT: NextAction[] = [];
-
-function EmptyRow({ text }: { text: string }) {
+function StatusBadge({ status }: { status: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-line bg-panel2/40 px-3.5 py-4 text-center text-[12.5px] text-dim">
-      {text}
-    </div>
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize",
+        STATUS_STYLE[status] ?? STATUS_STYLE.proposed,
+      )}
+    >
+      {status.replace(/_/g, " ")}
+    </span>
   );
 }
 
 export function NextStepsPanel({ topicId }: { topicId: string }) {
-  void topicId; // reserved for the live pending-decision / roadmap-next fetch
-  const [decisions] = useState<Decision[]>(SAMPLE_DECISIONS);
-  const [next] = useState<NextAction[]>(SAMPLE_NEXT);
+  const [data, setData] = useState<NextStep | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setData(await cytapi.nextStep(topicId));
+    } catch {
+      /* fail-soft — keep the last good next-step */
+    } finally {
+      setLoading(false);
+    }
+  }, [topicId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const current = data?.current ?? null;
+  const recommended = data?.recommended ?? [];
 
   return (
     <div className="space-y-6 p-4">
       <div>
         <h3 className="text-[15px] font-semibold">NEXT</h3>
         <p className="text-[13px] text-mut">
-          What&apos;s coming next, and anything waiting on your call. The crew keeps
-          moving on its own — you steer the few forks that need you.
+          The one step driving the project forward, plus the carry-overs worth
+          prioritizing. The crew keeps moving on its own — this is what&apos;s next.
         </p>
       </div>
 
-      {/* Decisions waiting for the owner — the on-the-loop forks. */}
+      {/* THE next step — always present once activated. */}
       <div>
         <div className="mb-2 flex items-center gap-2 text-[12px] uppercase tracking-wider text-dim">
-          <GitBranch size={13} /> Decisions waiting for you
+          <Zap size={13} /> Your next step
         </div>
-        {decisions.length === 0 ? (
-          <EmptyRow text="Nothing needs your decision right now — the crew is handling it." />
-        ) : (
-          <div className="space-y-2.5">
-            {decisions.map((d) => (
-              <div key={d.id} className="rounded-2xl border border-brand/40 bg-brand/5 p-4">
-                <div className="flex items-start gap-2">
-                  <CircleHelpIcon size={15} className="mt-0.5 flex-none text-brand" />
-                  <div className="min-w-0">
-                    <div className="text-[13.5px] font-semibold text-ink">{d.question}</div>
-                    <p className="mt-0.5 text-[12.5px] text-mut">{d.detail}</p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {d.options.map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      className={cn(
-                        "rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12.5px] text-mut transition-colors hover:text-ink",
-                      )}
-                    >
-                      {o}
-                    </button>
-                  ))}
-                </div>
+        {loading ? (
+          <p className="text-[13px] text-mut">Loading…</p>
+        ) : current ? (
+          <div className="rounded-2xl border border-brand/40 bg-brand/5 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[14px] font-semibold text-ink">{current.title}</div>
+                {current.description && (
+                  <p className="mt-1 text-[12.5px] text-mut">{current.description}</p>
+                )}
               </div>
-            ))}
+              <StatusBadge status={current.status} />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px]">
+              <span className="rounded-md border border-line bg-panel2 px-2 py-0.5 text-mut">
+                Priority {current.priority}
+              </span>
+              {current.agent_type && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-line bg-panel2 px-2 py-0.5 text-mut">
+                  <ArrowRight size={11} /> {agentLabel(current.agent_type)}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line bg-panel2/40 px-3.5 py-4 text-center text-[12.5px] text-dim">
+            No next step yet — hit Start now and Winslow will set one.
           </div>
         )}
       </div>
 
-      {/* Next steps / actions in flight. */}
+      {/* Recommended carry-overs — the rest of the open queue, priority order. */}
       <div>
         <div className="mb-2 flex items-center gap-2 text-[12px] uppercase tracking-wider text-dim">
-          <ListChecks size={13} /> Next steps &amp; actions
+          <ListChecks size={13} /> Recommended next
         </div>
-        {next.length === 0 ? (
-          <EmptyRow text="No queued next actions yet — activate the crew and they'll line up here." />
+        {loading ? (
+          <p className="text-[13px] text-mut">Loading…</p>
+        ) : recommended.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-line bg-panel2/40 px-3.5 py-4 text-center text-[12.5px] text-dim">
+            Nothing carried over — the queue is clear beyond your next step.
+          </div>
         ) : (
           <div className="space-y-2">
-            {next.map((n) => (
+            {recommended.map((e: RoadmapEntry) => (
               <div
-                key={n.id}
+                key={e.id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel px-3.5 py-3"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span className="grid h-6 w-6 flex-none place-items-center rounded-md border border-line bg-panel2 text-mut">
-                    <ArrowRight size={13} />
+                    <Flag size={12} />
                   </span>
-                  <span className="text-[13px] text-ink">{n.label}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] text-ink">{e.title}</div>
+                    <div className="text-[11px] text-dim">
+                      Priority {e.priority}
+                      {e.agent_type ? ` · ${agentLabel(e.agent_type)}` : ""}
+                    </div>
+                  </div>
                 </div>
-                <span className="flex-none text-[11.5px] text-dim">{n.by}</span>
+                <StatusBadge status={e.status} />
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      <div className="flex items-start gap-2 rounded-xl border border-line bg-panel2/50 p-3 text-[11.5px] text-dim">
-        <Check size={13} className="mt-0.5 flex-none" />
-        <span>
-          This feed wires to the orchestrator&apos;s pending-decision and roadmap-next
-          signals — decisions land here the moment the crew hits a fork that needs you.
-        </span>
       </div>
     </div>
   );
