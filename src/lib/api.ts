@@ -1391,10 +1391,18 @@ export type RoadmapEntry = {
   status: RoadmapStatus;
   priority: number; // 1 = highest / do first
   source: string; // winslow | owner | analyst | promotion
+  // Which specialist this entry is farmed out to (null = unassigned backlog).
+  agent_type: string | null;
   task_id: number | null;
   shipped_at: string | null;
   release_note: string | null;
   updated_at: string | null;
+};
+
+/** One agent's slice of the roadmap: its open queue (priority order) + a rollup. */
+export type RoadmapAgentBucket = {
+  queue: RoadmapEntry[];
+  counts: { open: number; shipped: number; total: number };
 };
 
 /** The topic's roadmap: the open queue (priority order), shipped history, next. */
@@ -1409,6 +1417,9 @@ export type RoadmapLedger = {
     shipped: number;
     total: number;
   };
+  // The roadmap sliced per assigned agent (agent_type → bucket), plus an
+  // `unassigned` bucket for the backlog. Only agents with ≥1 entry appear.
+  by_agent: Record<string, RoadmapAgentBucket>;
 };
 
 /* ------------------------------ Ads page hub ------------------------------- */
@@ -1929,6 +1940,16 @@ export const cytapi = {
     client.post<RoadmapEntry>(`/me/topics/${id}/roadmap/${entryId}/status`, {
       status,
       ...(release_note ? { release_note } : {}),
+    }),
+  // Farm a roadmap entry out to a specialist (agent_type = a key of config/agents;
+  // null unassigns it back to the backlog). The entry then joins that agent's queue.
+  assignRoadmapEntry: (
+    id: string | number,
+    entryId: number,
+    agentType: string | null,
+  ) =>
+    client.post<RoadmapEntry>(`/me/topics/${id}/roadmap/${entryId}/assign`, {
+      agent_type: agentType,
     }),
 
   // Interactive per-topic goals (daily / weekly / monthly momentum steps).
