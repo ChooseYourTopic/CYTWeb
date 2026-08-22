@@ -376,163 +376,170 @@ export function ResearchDashboard({
         </div>
       </header>
 
-      {/* Topic header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="text-[13px] uppercase tracking-wide text-mut">
-            Your topic
-          </div>
-          <h2 className="mt-1 flex items-center gap-2.5 text-[24px] font-bold tracking-tight">
-            {topicName}
-            <RunModeBadge mode={overview?.run_mode} source={overview?.run_source} />
-          </h2>
-          <div className="text-[14px] text-mut">{tagline}</div>
-          {overview?.license && (
-            <div
-              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2 py-0.5 text-[11px] text-mut"
-              title="This topic is on your account — verified server-side by ownership + license."
-            >
-              <span>{overview.license.label ?? overview.license.type}</span>
-              {overview.license.id && (
-                <span className="font-mono text-dim"> · {overview.license.id}</span>
-              )}
-              {overview.license.status !== "active" && (
-                <span className="text-warn"> · {overview.license.status}</span>
-              )}
+      {/* Topic content (left half) + action rail (right, just below the top nav) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        {/* LEFT: the topic's content, sections, and body text */}
+        <div className="min-w-0">
+          {/* Topic title */}
+          <div className="mb-4">
+            <div className="text-[13px] uppercase tracking-wide text-mut">
+              Your topic
             </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Start now → activate Winslow (orchestrator) for this topic. */}
-          <button
-            type="button"
-            onClick={startWinslow}
-            disabled={starting}
-            title="Activate Winslow — he plans the day and the crew fans out"
-            className="cyt-gradient-bg inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-bg transition-opacity disabled:opacity-60"
-          >
-            {starting ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Zap size={14} strokeWidth={2.5} />
-            )}
-            {started ? "Winslow activated" : "Start now"}
-          </button>
-          {/* Roadmap → the topic's priority-ordered work queue. */}
-          <Link
-            href={`/topic/${topicId}/roadmap`}
-            title="This topic's roadmap — the work queue in priority order"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
-          >
-            <Flag size={14} />
-            <span className="hidden sm:inline">Roadmap</span>
-          </Link>
-          {/* Tickets → the support desk: open a ticket, track updates, reopen. */}
-          <Link
-            href="/support"
-            title="Support tickets — open a ticket and review updates from a support agent"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
-          >
-            <Ticket size={14} />
-            <span className="hidden sm:inline">Tickets</span>
-          </Link>
-          <div className="rounded-card border border-line bg-panel px-4 py-3 text-right">
-            <div className="text-[12px] uppercase tracking-wide text-mut">
-              Cycle
-            </div>
-            <div className="text-[18px] font-bold">Day {cycleDay}</div>
-            <div className="text-[12px] text-dim">{cyclePhase}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Paused: the agents are soft shut down and the panels stop polling
-          (one-shot, saved state), but everything stays navigable — a slim
-          banner replaces the old blocking card so settings + every tab, incl.
-          the overview, remain viewable while paused. */}
-      {paused && (
-        <Card>
-          <div className="flex flex-col items-center justify-between gap-3 px-5 py-4 text-center sm:flex-row sm:text-left">
-            <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#4a3b1a] bg-[#1c1708] text-warn">
-                <Pause size={18} />
-              </span>
-              <div>
-                <h3 className="text-[15px] font-bold text-ink">Project paused</h3>
-                <p className="text-[13px] text-mut">
-                  You&apos;re viewing{" "}
-                  <span className="text-ink">{topicName}</span>&apos;s saved
-                  state. The agents are stopped and won&apos;t take on new work
-                  until you resume — settings and every tab stay open to browse.
-                </p>
+            <h2 className="mt-1 flex items-center gap-2.5 text-[24px] font-bold tracking-tight">
+              {topicName}
+              <RunModeBadge mode={overview?.run_mode} source={overview?.run_source} />
+            </h2>
+            <div className="text-[14px] text-mut">{tagline}</div>
+            {overview?.license && (
+              <div
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-line bg-panel2 px-2 py-0.5 text-[11px] text-mut"
+                title="This topic is on your account — verified server-side by ownership + license."
+              >
+                <span>{overview.license.label ?? overview.license.type}</span>
+                {overview.license.id && (
+                  <span className="font-mono text-dim"> · {overview.license.id}</span>
+                )}
+                {overview.license.status !== "active" && (
+                  <span className="text-warn"> · {overview.license.status}</span>
+                )}
               </div>
+            )}
+          </div>
+
+          {/* Paused: the agents are soft shut down and the panels stop polling
+              (one-shot, saved state), but everything stays navigable — a slim
+              banner replaces the old blocking card so settings + every tab, incl.
+              the overview, remain viewable while paused. */}
+          {paused && (
+            <Card className="mb-4">
+              <div className="flex flex-col items-center justify-between gap-3 px-5 py-4 text-center sm:flex-row sm:text-left">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#4a3b1a] bg-[#1c1708] text-warn">
+                    <Pause size={18} />
+                  </span>
+                  <div>
+                    <h3 className="text-[15px] font-bold text-ink">Project paused</h3>
+                    <p className="text-[13px] text-mut">
+                      You&apos;re viewing{" "}
+                      <span className="text-ink">{topicName}</span>&apos;s saved
+                      state. The agents are stopped and won&apos;t take on new work
+                      until you resume — settings and every tab stay open to browse.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={togglePause}
+                  disabled={pauseBusy}
+                  className="cyt-gradient-bg inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold text-bg disabled:opacity-60"
+                >
+                  {pauseBusy ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Play size={16} strokeWidth={2.5} />
+                  )}
+                  Resume project
+                </button>
+              </div>
+            </Card>
+          )}
+
+          <KpiTiles
+            overview={overview}
+            finance={finance}
+            findings={Number(findings)}
+            activeAgents={activeAgents}
+            agentStatuses={agentStatuses}
+            topicId={topicId}
+            loading={loading}
+          />
+
+          {/* Canvas — the topic's sections + body text */}
+          <Card className="mt-4">
+            <SectionTabs />
+            <div>
+              {active === "overview" && (
+                <LivingReport
+                  overview={overview}
+                  loading={loading}
+                  topicId={topicId}
+                  agentStatuses={agentStatuses}
+                />
+              )}
+              {active === "battlepass" && <BattlePassPanel topicId={topicId} />}
+              {active === "context" && <ContextPanel topicId={topicId} />}
+              {active === "integrations" && (
+                <IntegrationsPanel topicId={topicId} />
+              )}
+              {active === "models" && <ModelsPanel />}
+              {active === "status" && <StatusPanel topicId={topicId} />}
+              {active === "team" && <TeamStatusPanel topicId={topicId} />}
+              {active === "automations" && <AutomationsPanel />}
+              {active === "network" && <NetworkPanel />}
+              {active === "security" && <SecurityPanel />}
+              {active === "competitors" && <CompetitorPanel topicId={topicId} />}
+              {active === "market" && <MarketSignalsPanel topicId={topicId} />}
+              {active === "drafts" && <DraftsPanel topicId={topicId} />}
+              {active === "outreach" && <OutreachPanel topicId={topicId} />}
+              {active === "support" && <SupportPanel topicId={topicId} />}
+              {active === "ads" && <AdsPanel topicId={topicId} />}
+              {active === "build" && <BuildPanel topicId={topicId} />}
+              {active === "finance" && <FinancePanel topicId={topicId} />}
+              {active === "decisions" && <DecisionsPanel />}
+              {active === "report" && <ReportArtifact />}
+              {active === "media" && <MediaPanel />}
             </div>
+          </Card>
+        </div>
+
+        {/* RIGHT: actions just below the top nav (Your topics / Resume),
+            then the investigation rail underneath. */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            {/* Start now → activate Winslow (orchestrator) for this topic. */}
             <button
               type="button"
-              onClick={togglePause}
-              disabled={pauseBusy}
-              className="cyt-gradient-bg inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold text-bg disabled:opacity-60"
+              onClick={startWinslow}
+              disabled={starting}
+              title="Activate Winslow — he plans the day and the crew fans out"
+              className="cyt-gradient-bg inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-bg transition-opacity disabled:opacity-60"
             >
-              {pauseBusy ? (
-                <Loader2 size={16} className="animate-spin" />
+              {starting ? (
+                <Loader2 size={14} className="animate-spin" />
               ) : (
-                <Play size={16} strokeWidth={2.5} />
+                <Zap size={14} strokeWidth={2.5} />
               )}
-              Resume project
+              {started ? "Winslow activated" : "Start now"}
             </button>
+            {/* Roadmap → the topic's priority-ordered work queue. */}
+            <Link
+              href={`/topic/${topicId}/roadmap`}
+              title="This topic's roadmap — the work queue in priority order"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
+            >
+              <Flag size={14} />
+              <span>Roadmap</span>
+            </Link>
+            {/* Tickets → the support desk: open a ticket, track updates, reopen. */}
+            <Link
+              href="/support"
+              title="Support tickets — open a ticket and review updates from a support agent"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-[13px] text-mut transition-colors hover:text-ink"
+            >
+              <Ticket size={14} />
+              <span>Tickets</span>
+            </Link>
+            <div className="rounded-card border border-line bg-panel px-4 py-3">
+              <div className="text-[12px] uppercase tracking-wide text-mut">
+                Cycle
+              </div>
+              <div className="text-[18px] font-bold">Day {cycleDay}</div>
+              <div className="text-[12px] text-dim">{cyclePhase}</div>
+            </div>
           </div>
-        </Card>
-      )}
 
-      <KpiTiles
-        overview={overview}
-        finance={finance}
-        findings={Number(findings)}
-        activeAgents={activeAgents}
-        agentStatuses={agentStatuses}
-        topicId={topicId}
-        loading={loading}
-      />
-
-      {/* Canvas + investigation rail */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-        <Card>
-          <SectionTabs />
-          <div>
-            {active === "overview" && (
-              <LivingReport
-                overview={overview}
-                loading={loading}
-                topicId={topicId}
-                agentStatuses={agentStatuses}
-              />
-            )}
-            {active === "battlepass" && <BattlePassPanel topicId={topicId} />}
-            {active === "context" && <ContextPanel topicId={topicId} />}
-            {active === "integrations" && (
-              <IntegrationsPanel topicId={topicId} />
-            )}
-            {active === "models" && <ModelsPanel />}
-            {active === "status" && <StatusPanel topicId={topicId} />}
-            {active === "team" && <TeamStatusPanel topicId={topicId} />}
-            {active === "automations" && <AutomationsPanel />}
-            {active === "network" && <NetworkPanel />}
-            {active === "security" && <SecurityPanel />}
-            {active === "competitors" && <CompetitorPanel topicId={topicId} />}
-            {active === "market" && <MarketSignalsPanel topicId={topicId} />}
-            {active === "drafts" && <DraftsPanel topicId={topicId} />}
-            {active === "outreach" && <OutreachPanel topicId={topicId} />}
-            {active === "support" && <SupportPanel topicId={topicId} />}
-            {active === "ads" && <AdsPanel topicId={topicId} />}
-            {active === "build" && <BuildPanel topicId={topicId} />}
-            {active === "finance" && <FinancePanel topicId={topicId} />}
-            {active === "decisions" && <DecisionsPanel />}
-            {active === "report" && <ReportArtifact />}
-            {active === "media" && <MediaPanel />}
-          </div>
-        </Card>
-
-        <InvestigationRail companyId={topicId} />
+          <InvestigationRail companyId={topicId} />
+        </div>
       </div>
     </main>
   );
