@@ -119,6 +119,47 @@ function AssignControl({
   );
 }
 
+/** The lifecycle the owner can move an entry through, in order, with human labels. */
+const STATUS_STEPS: RoadmapStatus[] = [
+  "proposed",
+  "in_progress",
+  "in_review",
+  "shipped",
+  "archived",
+];
+
+/**
+ * Inline status menu on an entry — advance a deliverable through its lifecycle
+ * (Queued → In progress → In review → Shipped, or Archived) right from the
+ * roadmap. Calls back with the new status; disabled while the ledger refetches.
+ */
+function StatusControl({
+  entry,
+  busy,
+  onSetStatus,
+}: {
+  entry: RoadmapEntry;
+  busy: boolean;
+  onSetStatus: (status: RoadmapStatus) => void;
+}) {
+  return (
+    <select
+      aria-label="Set status"
+      title="Move this entry through its lifecycle"
+      value={entry.status}
+      disabled={busy}
+      onChange={(e) => onSetStatus(e.target.value as RoadmapStatus)}
+      className="cyt-input h-7 w-[130px] shrink-0 text-[12px] disabled:opacity-40"
+    >
+      {STATUS_STEPS.map((s) => (
+        <option key={s} value={s}>
+          {STATUS_META[s].label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function QueueRow({
   entry,
   control,
@@ -224,6 +265,9 @@ export default function TopicRoadmapPage({
   // The entry id currently being (re)assigned, so its control disables while the
   // ledger refetches.
   const [assigningId, setAssigningId] = useState<number | null>(null);
+  // The entry id currently having its status advanced, so its control disables
+  // while the ledger refetches.
+  const [statusingId, setStatusingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -276,15 +320,40 @@ export default function TopicRoadmapPage({
     [params.id, load],
   );
 
+  // Move an entry through its lifecycle (proposed → in_progress → in_review →
+  // shipped / archived), then refetch so the next step + by-agent queues re-point
+  // live (a shipped entry naturally drops out of the open queue).
+  const setStatus = useCallback(
+    async (entryId: number, status: RoadmapStatus) => {
+      setStatusingId(entryId);
+      try {
+        await cytapi.setRoadmapEntryStatus(params.id, entryId, status);
+        await load();
+      } catch {
+        /* fail-soft — keep the last-good ledger */
+      } finally {
+        setStatusingId(null);
+      }
+    },
+    [params.id, load],
+  );
+
   const renderControl = useCallback(
     (entry: RoadmapEntry) => (
-      <AssignControl
-        entry={entry}
-        busy={assigningId === entry.id}
-        onAssign={(agentType) => assign(entry.id, agentType)}
-      />
+      <div className="flex items-center gap-1.5">
+        <StatusControl
+          entry={entry}
+          busy={statusingId === entry.id}
+          onSetStatus={(status) => setStatus(entry.id, status)}
+        />
+        <AssignControl
+          entry={entry}
+          busy={assigningId === entry.id}
+          onAssign={(agentType) => assign(entry.id, agentType)}
+        />
+      </div>
     ),
-    [assign, assigningId],
+    [assign, assigningId, setStatus, statusingId],
   );
 
   const counts = ledger?.counts;
