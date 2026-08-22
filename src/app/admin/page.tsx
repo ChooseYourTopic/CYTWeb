@@ -114,12 +114,23 @@ const TABS: { key: TabKey; label: string; Icon: typeof LifeBuoy }[] = [
   { key: "activity", label: "Activity", Icon: Activity },
 ];
 
+/**
+ * Seed the opening tab from `?tab=` so the sign-in role chooser can land the
+ * support role on the queue and the admin role on the overview. Read from the URL
+ * directly (not useSearchParams) to avoid a Suspense boundary; defaults to support.
+ */
+function initialTab(): TabKey {
+  if (typeof window === "undefined") return "support";
+  const t = new URLSearchParams(window.location.search).get("tab");
+  return TABS.some((tab) => tab.key === t) ? (t as TabKey) : "support";
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [whoami, setWhoami] = useState<StaffWhoami | null>(null);
   const [loading, setLoading] = useState(true);
   const [challenge, setChallenge] = useState<"enroll" | "verify" | null>(null);
-  const [tab, setTab] = useState<TabKey>("support");
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   const loadWhoami = useCallback(async () => {
     setLoading(true);

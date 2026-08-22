@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Smartphone, ShieldCheck, Mail, Eye, EyeOff } from "lucide-react";
+import {
+  ArrowRight,
+  Smartphone,
+  ShieldCheck,
+  Mail,
+  Eye,
+  EyeOff,
+  LayoutDashboard,
+  LifeBuoy,
+} from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { cytapi } from "@/lib/api";
 
@@ -39,6 +48,56 @@ function isValidPhone(e164: string): boolean {
 }
 
 /**
+ * A "door" an account can enter after signing in. One account can hold several
+ * roles at once (a support agent who also runs their own topics; an admin who is
+ * all three), so a login can offer more than one destination.
+ */
+type RoleOption = {
+  key: "user" | "support" | "admin";
+  label: string;
+  desc: string;
+  href: string;
+  Icon: typeof ShieldCheck;
+};
+
+/**
+ * Derive the role doors for an account from its /me flags. Every account is a
+ * user (their own topics); `is_support` adds the support desk and `is_admin` adds
+ * the admin portal. Order: user → support → admin. When only one door exists the
+ * caller routes straight there; two or more triggers the chooser.
+ */
+function rolesFor(me: { is_admin?: boolean; is_support?: boolean }): RoleOption[] {
+  const opts: RoleOption[] = [
+    {
+      key: "user",
+      label: "My topics",
+      desc: "Your dashboard — run your own AI companies.",
+      href: "/dashboard",
+      Icon: LayoutDashboard,
+    },
+  ];
+  if (me.is_support) {
+    opts.push({
+      key: "support",
+      label: "Support desk",
+      desc: "Work the support queue and help other users.",
+      href: "/admin?tab=support",
+      Icon: LifeBuoy,
+    });
+  }
+  if (me.is_admin) {
+    opts.push({
+      key: "admin",
+      label: "Admin portal",
+      desc: "The full operator console — users, companies, activity.",
+      href: "/admin?tab=overview",
+      Icon: ShieldCheck,
+    });
+  }
+  return opts;
+}
+
+/**
  * Phone-first, SMS-code sign-in. Two steps:
  *   1) enter mobile number → POST /auth/sms/request → code texted
  *   2) enter the 6-digit code → POST /auth/sms/verify → session
@@ -60,27 +119,36 @@ export default function SignInPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
-  // Dual-role chooser: shown after login when the account is BOTH staff (admin/
-  // support) AND a standard user with topics — "which view are you here for?".
-  const [roleChoice, setRoleChoice] = useState(false);
+  // Multi-role chooser: after login we read the account's roles and, when it holds
+  // more than one, prompt which view to enter. A single-role account routes straight.
+  const [roleOptions, setRoleOptions] = useState<RoleOption[] | null>(null);
 
-  // After any successful sign-in, route by role: a dual-role account is asked
-  // which view; a staff-only account goes to the support portal; everyone else to
-  // their dashboard. Fail-soft: any hiccup lands on the dashboard.
+  // After any successful sign-in, read the account's roles. More than one door →
+  // show the chooser; exactly one → go straight there. Fail-soft to the dashboard.
   async function afterAuth() {
     try {
       const me = await cytapi.me();
-      const staff = Boolean(me.is_staff || me.is_admin || me.is_support);
-      const hasTopics = (me.topics_count ?? 0) > 0;
-      if (staff && hasTopics) {
-        setRoleChoice(true);
+      const options = rolesFor(me);
+      if (options.length > 1) {
+        setRoleOptions(options);
         setBusy(false);
         return;
       }
-      window.location.href = staff ? "/admin" : "/dashboard";
+      enterRole(options[0]);
     } catch {
       window.location.href = "/dashboard";
     }
+  }
+
+  // Enter a chosen role: remember it (so the app can reflect the active view and
+  // offer a later "switch role") and navigate to that door.
+  function enterRole(opt: RoleOption) {
+    try {
+      window.localStorage.setItem("cyt_active_role", opt.key);
+    } catch {
+      /* non-fatal — routing still works without the persisted hint */
+    }
+    window.location.href = opt.href;
   }
 
   async function passwordSignIn() {
@@ -172,7 +240,7 @@ export default function SignInPage() {
 
       <section className="mx-auto mt-16 max-w-md">
         <div className="rounded-2xl border border-line bg-panel p-8 shadow-[0_20px_60px_-30px_#000]">
-          {roleChoice ? (
+          {roleOptions ? (
             <>
               <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl border border-line bg-panel2">
                 <ShieldCheck size={20} className="text-brand" />
@@ -181,37 +249,41 @@ export default function SignInPage() {
                 Welcome back
               </h1>
               <p className="mt-2 text-[14px] text-mut">
-                This account is both an admin and a user. Which view are you here
-                for?
+                This account has more than one role. Which view are you here for?
               </p>
-              <button
-                onClick={() => (window.location.href = "/dashboard")}
-                className="mt-6 flex w-full items-center justify-between rounded-xl border border-line bg-panel2 px-5 py-4 text-left transition-colors hover:border-[#31384c]"
-              >
-                <span>
-                  <span className="block text-[15px] font-bold text-ink">
-                    My topics
-                  </span>
-                  <span className="block text-[12.5px] text-mut">
-                    Your dashboard — run your own AI companies.
-                  </span>
-                </span>
-                <ArrowRight size={18} className="text-mut" />
-              </button>
-              <button
-                onClick={() => (window.location.href = "/admin")}
-                className="cyt-gradient-bg mt-3 flex w-full items-center justify-between rounded-xl px-5 py-4 text-left text-bg"
-              >
-                <span>
-                  <span className="block text-[15px] font-bold">
-                    Support desk
-                  </span>
-                  <span className="block text-[12.5px] opacity-80">
-                    The admin portal — work the support queue.
-                  </span>
-                </span>
-                <ArrowRight size={18} />
-              </button>
+              <div className="mt-6 space-y-3">
+                {roleOptions.map((opt, i) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => enterRole(opt)}
+                    className={
+                      i === 0
+                        ? "flex w-full items-center justify-between rounded-xl border border-line bg-panel2 px-5 py-4 text-left transition-colors hover:border-[#31384c]"
+                        : "cyt-gradient-bg flex w-full items-center justify-between rounded-xl px-5 py-4 text-left text-bg"
+                    }
+                  >
+                    <span className="flex items-center gap-3">
+                      <opt.Icon
+                        size={20}
+                        className={i === 0 ? "shrink-0 text-brand" : "shrink-0"}
+                      />
+                      <span>
+                        <span
+                          className={`block text-[15px] font-bold ${i === 0 ? "text-ink" : ""}`}
+                        >
+                          {opt.label}
+                        </span>
+                        <span
+                          className={`block text-[12.5px] ${i === 0 ? "text-mut" : "opacity-80"}`}
+                        >
+                          {opt.desc}
+                        </span>
+                      </span>
+                    </span>
+                    <ArrowRight size={18} className={i === 0 ? "text-mut" : ""} />
+                  </button>
+                ))}
+              </div>
             </>
           ) : emailMode ? (
             <>
