@@ -39,16 +39,6 @@ const KIND_ICON: Record<MediaKind, typeof ImageIcon> = {
   other: Wand2,
 };
 
-const KIND_LABEL: Record<MediaKind, string> = {
-  image: "Image",
-  video: "Video",
-  audio: "Audio",
-  social: "Social",
-  ad: "Ad",
-  text: "Copy",
-  other: "Project",
-};
-
 function ProjectCard({
   p,
   recommended,

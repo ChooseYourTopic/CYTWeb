@@ -28,7 +28,7 @@ import {
   type LeaderboardMilestone,
   type TopicLeaderboard,
 } from "@/lib/api";
-import { iconFor, frameFor } from "@/components/research/challengeIcons";
+import { iconFor } from "@/components/research/challengeIcons";
 import { ChallengeBoard } from "@/components/research/ChallengeBoard";
 
 /** Rank medal color for the top three; muted chip otherwise. */
