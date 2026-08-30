@@ -1033,6 +1033,31 @@ export type McpTokenMint = {
   expires_at: string | null;
 };
 
+// Empire Integration Bridge key — a scoped, revocable bearer another Empire
+// platform (e.g. QuickerBiz) presents to PULL this owner's topic + customer
+// records one-way. Secrets are never returned; `label` is a masked tail and
+// `scopes` gate what the key may read (READ-ONLY this release). The api key +
+// signing secret are shown ONCE at mint (see BridgeKeyMint).
+export type BridgeKey = {
+  id: number;
+  partner: string;
+  name: string | null;
+  label: string | null;
+  scopes: string[];
+  created_at: string | null;
+  last_used_at: string | null;
+  expires_at: string | null;
+  live: boolean;
+};
+
+// The one-time mint response — `api_key` + `signing_secret` are the full
+// plaintext, shown once and never returned again; `key` is the masked row.
+export type BridgeKeyMint = {
+  api_key: string;
+  signing_secret: string;
+  key: BridgeKey;
+};
+
 // Per-topic integration connection status — one connected provider. Secrets are
 // never returned; `masked_key` (when the backend provides it) is a display-only
 // masked identifier for the connected credential, never the secret itself.
@@ -2135,6 +2160,20 @@ export const cytapi = {
     get: () => client.get<McpTokenStatus>("/me/mcp-token"),
     mint: () => client.post<McpTokenMint>("/me/mcp-token"),
     revoke: () => client.del<{ connected: boolean }>("/me/mcp-token"),
+  },
+
+  // Empire Integration Bridge keys — the owner's self-service management of the
+  // scoped `cyt_qb_` bearers a consumer platform presents to PULL their topic +
+  // customer records one-way. `list` is masked status only; `issue` mints and
+  // returns the api key + signing secret ONCE (read-only scopes — the backend
+  // 422s any `*:write` scope until two-way sync ships); `revoke` fails a key
+  // closed. Owner-scoped: only the caller's own keys.
+  bridgeKeys: {
+    list: () => client.get<{ keys: BridgeKey[] }>("/me/bridge-keys"),
+    issue: (payload: { partner: string; name?: string; scopes?: string[] }) =>
+      client.post<BridgeKeyMint>("/me/bridge-keys", payload),
+    revoke: (id: number) =>
+      client.del<{ revoked: boolean }>(`/me/bridge-keys/${id}`),
   },
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the
