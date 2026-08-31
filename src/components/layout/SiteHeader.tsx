@@ -59,6 +59,9 @@ export function SiteHeader() {
             <Link href="/partners" className={linkCls}>
               Partners
             </Link>
+            <Link href="/integrations" className={linkCls}>
+              Integrations
+            </Link>
             <Link href="/settings" className={linkCls}>
               Settings
             </Link>
