@@ -1425,6 +1425,18 @@ function BridgeKeysCard() {
         title="API Access — Empire Bridge"
         desc="Issue scoped keys that let another Empire platform (like QuickerBiz) pull your topics and customers — one-way, read-only. Keys are shown once and can be revoked anytime."
       >
+        <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-line bg-panel2 px-3.5 py-3 text-[12.5px] text-mut">
+          <Plug size={15} className="mt-0.5 shrink-0 text-brand" />
+          <span>
+            Browse the{" "}
+            <Link href="/integrations" className="font-semibold text-brand hover:underline">
+              Integrations directory
+            </Link>{" "}
+            to set up a specific Empire platform with a guided how-to — or issue and manage every
+            key right here.
+          </span>
+        </div>
+
         {/* Issued keys */}
         <div className="mb-5">
           <div className="mb-2 text-[12px] uppercase tracking-wider text-dim">
