@@ -23,6 +23,54 @@ import {
   type ProviderUsage,
 } from "@/lib/api";
 import { useStepUpGuard, STEP_UP_CANCELLED } from "@/components/security/TwoFactor";
+import {
+  EMPIRE_PLATFORMS,
+  EXTERNAL_PLATFORMS,
+  DEFAULT_AI_PLATFORM,
+  platformLabel,
+} from "@/lib/platform-directory";
+
+/**
+ * Which app/platform this AI-model token is tagged for — sourced from the same
+ * Empire platform directory the bridge-key issuer uses (#4, 2026-09-22). Defaults to
+ * ChooseYourTopic (the account's own agents); any other pick tags the token as
+ * intended for that app instead (e.g. issuing a Claude key meant for QuickerBiz).
+ */
+function PlatformSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (slug: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] uppercase tracking-wide text-dim">
+        Platform — which app this token is for
+      </label>
+      <select
+        className="cyt-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <optgroup label="Empire">
+          {EMPIRE_PLATFORMS.map((p) => (
+            <option key={p.slug} value={p.slug}>
+              {p.label}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="External">
+          {EXTERNAL_PLATFORMS.map((p) => (
+            <option key={p.slug} value={p.slug}>
+              {p.label}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+    </div>
+  );
+}
 
 /** Format a USD cost compactly — sub-cent shows more precision. */
 function money(n: number): string {
@@ -86,6 +134,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [keyInput, setKeyInput] = useState("");
+  const [platform, setPlatform] = useState(DEFAULT_AI_PLATFORM);
   const [busy, setBusy] = useState<"save" | "test" | "disconnect" | null>(null);
   const [confirmOff, setConfirmOff] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -117,7 +166,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
     setBusy("save");
     setMsg(null);
     try {
-      const res = await guard(() => cytapi.aiCredential.saveApiKey(k));
+      const res = await guard(() => cytapi.aiCredential.saveApiKey(k, undefined, platform));
       setCred(res);
       setKeyInput("");
       setShowForm(false);
@@ -230,6 +279,9 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
                 </span>
               )}
               <span>{cred?.auth_type === "oauth" ? "connected account" : "API key"}</span>
+              <span className="rounded-full border border-line px-1.5 py-0 text-[10px] uppercase tracking-wide text-dim">
+                for {platformLabel(cred?.platform)}
+              </span>
               {cred?.last_validated_at && <span>checked {fmt(cred.last_validated_at)}</span>}
             </div>
           )}
@@ -257,6 +309,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
                 placeholder="sk-ant-…"
                 className="w-full rounded-lg border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:border-brand focus:outline-none"
               />
+              <PlatformSelect value={platform} onChange={setPlatform} />
               <p className="text-[11px] text-dim">
                 We validate the key with Anthropic before saving — a bad key is never stored.
                 Your existing key stays active until a new one is verified.
@@ -380,6 +433,7 @@ function ModelTile({
 }) {
   const [open, setOpen] = useState(false);
   const [keyInput, setKeyInput] = useState("");
+  const [platform, setPlatform] = useState(DEFAULT_AI_PLATFORM);
   const [busy, setBusy] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -394,7 +448,7 @@ function ModelTile({
     setBusy(true);
     setMsg(null);
     try {
-      await guard(() => cytapi.aiCredential.saveApiKey(k, model.provider!));
+      await guard(() => cytapi.aiCredential.saveApiKey(k, model.provider!, platform));
       setKeyInput("");
       setOpen(false);
       setMsg({ ok: true, text: `${model.name} connected — it's now your active provider.` });
@@ -442,6 +496,7 @@ function ModelTile({
                 placeholder={model.keyHint}
                 className="w-full rounded-lg border border-line bg-panel2 px-3 py-2 text-[13px] text-ink placeholder:text-dim focus:border-brand focus:outline-none"
               />
+              <PlatformSelect value={platform} onChange={setPlatform} />
               <p className="text-[11px] text-dim">
                 Billed to your own {model.name} account. This becomes your active
                 provider, replacing the current one.
@@ -622,6 +677,9 @@ function ProviderLadder({
                     Active
                   </span>
                 ) : null}
+                <span className="rounded-full border border-line px-1.5 py-0 text-[10px] uppercase tracking-wide text-dim">
+                  for {platformLabel(r.platform)}
+                </span>
               </div>
               {r.account_label && (
                 <div className="text-[11px] text-dim">{r.account_label}</div>
