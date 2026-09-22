@@ -32,7 +32,12 @@ import {
   STEP_UP_CANCELLED,
 } from "@/components/security/TwoFactor";
 import { ModelsPanel } from "@/components/research/ModelsPanel";
-import { INTEGRATIONS } from "@/lib/integrations";
+import {
+  EMPIRE_PLATFORMS,
+  EXTERNAL_PLATFORMS,
+  OTHER_PLATFORM,
+  platformLabel,
+} from "@/lib/platform-directory";
 import {
   cytapi,
   ApiError,
@@ -1005,26 +1010,17 @@ function AiModelsCard() {
 // behind two-way sync and the option is disabled. Keys are masked after mint;
 // one-click revoke. Never a secret is re-shown after the mint modal closes.
 
-// The platform a key is issued FOR — SOURCED FROM THE INTEGRATIONS DIRECTORY (/integrations)
-// so every issued credential is associated with a specific platform the owner intends to use
-// it with (Tracy 2026-09-22). QuickerBiz (the registered Empire Bridge consumer) is featured
-// first; then the full integrations directory; then "Other" for anything unlisted (tagged by a
-// custom slug). A key's `partner` is that platform tag; multiple named keys per platform are
-// supported (C1).
-const OTHER_PARTNER = "__other__";
-const BRIDGE_PARTNERS: { slug: string; label: string }[] = [
-  { slug: "quickerbiz", label: "QuickerBiz" },
-  ...INTEGRATIONS.filter((i) => i.key !== "quickerbiz").map((i) => ({
-    slug: i.key,
-    label: i.name,
-  })),
-  { slug: OTHER_PARTNER, label: "Other integration / app…" },
-];
+// The platform a key is issued FOR — SOURCED FROM THE EMPIRE PLATFORM DIRECTORY
+// (`@/lib/platform-directory`) so every issued credential is associated with a specific
+// platform the owner intends to use it with (Tracy 2026-09-22, enhancement #4). Two
+// groups: every Kuykendall Empire product, then external partner-adapter placeholders
+// (QuickBooks, Zoho, …); "Other" covers anything unlisted (tagged by a custom slug). A
+// key's `partner` is that platform tag; multiple named keys per platform are supported (C1).
+const OTHER_PARTNER = OTHER_PLATFORM;
 
 /** Friendly label for a partner slug (falls back to the raw slug for custom apps). */
 function partnerLabel(slug: string): string {
-  const known = BRIDGE_PARTNERS.find((p) => p.slug === slug && p.slug !== OTHER_PARTNER);
-  return known?.label ?? slug;
+  return platformLabel(slug);
 }
 
 /** Group issued keys by their target-app slug, first-seen order preserved. */
@@ -1135,7 +1131,7 @@ type AccessRight = "read" | "readwrite";
 function BridgeKeysCard() {
   const [keys, setKeys] = useState<BridgeKey[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
-  const [partner, setPartner] = useState(BRIDGE_PARTNERS[0]?.slug ?? "");
+  const [partner, setPartner] = useState(EMPIRE_PLATFORMS[0]?.slug ?? "");
   // When "Other" is chosen, the target app is this custom slug (tags the key per app).
   const [customPartner, setCustomPartner] = useState("");
   const [name, setName] = useState("");
@@ -1359,11 +1355,21 @@ function BridgeKeysCard() {
                 value={partner}
                 onChange={(e) => setPartner(e.target.value)}
               >
-                {BRIDGE_PARTNERS.map((p) => (
-                  <option key={p.slug} value={p.slug}>
-                    {p.label}
-                  </option>
-                ))}
+                <optgroup label="Empire">
+                  {EMPIRE_PLATFORMS.map((p) => (
+                    <option key={p.slug} value={p.slug}>
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="External">
+                  {EXTERNAL_PLATFORMS.map((p) => (
+                    <option key={p.slug} value={p.slug}>
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <option value={OTHER_PARTNER}>Other integration / app…</option>
               </select>
             </Field>
             {partner === OTHER_PARTNER && (

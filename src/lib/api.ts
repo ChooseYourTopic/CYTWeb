@@ -1087,6 +1087,8 @@ export type ProviderUsage = {
 /** One rung of the provider ladder (a connected provider + its priority). */
 export type LadderRung = {
   provider: AiProvider;
+  // The Empire app / external platform this rung's token is tagged for (#4, 2026-09-22).
+  platform?: string | null;
   priority: number;
   auth_type: "api_key" | "oauth" | null;
   account_label: string | null;
@@ -1098,6 +1100,9 @@ export type LadderRung = {
 export type AiCredential = {
   connected: boolean;
   provider?: AiProvider;
+  // The Empire app / external platform this token is tagged for (defaults to
+  // "chooseyourtopic" server-side — the account's own agents). #4, 2026-09-22.
+  platform?: string | null;
   auth_type: "api_key" | "oauth" | null;
   account_label: string | null;
   status: "active" | "needs_reauth" | "insufficient_credit" | null;
@@ -2180,10 +2185,11 @@ export const cytapi = {
   // user's agent usage runs on their own account.
   aiCredential: {
     get: () => client.get<AiCredential>("/me/ai-credential"),
-    saveApiKey: (apiKey: string, provider?: AiProvider) =>
+    saveApiKey: (apiKey: string, provider?: AiProvider, platform?: string) =>
       client.put<AiCredential>("/me/ai-credential/api-key", {
         api_key: apiKey,
         ...(provider ? { provider } : {}),
+        ...(platform ? { platform } : {}),
       }),
     validate: () =>
       client.post<AiCredential & { ok: boolean; message: string }>(
