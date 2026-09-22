@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ShieldCheck,
@@ -10,8 +10,14 @@ import {
   Check,
   KeyRound,
   Smartphone,
+  X,
 } from "lucide-react";
-import { cytapi, ApiError, type TwoFactorStatus } from "@/lib/api";
+import {
+  cytapi,
+  ApiError,
+  totpChallenge,
+  type TwoFactorStatus,
+} from "@/lib/api";
 
 /* ------------------------------- primitives ------------------------------- */
 
@@ -433,4 +439,124 @@ export function AdminTwoFactorChallenge({
       </div>
     </div>
   );
+}
+
+/* --------------------------- reusable step-up gate ------------------------ */
+
+/** Raised by the step-up guard when the user dismisses the challenge instead of
+ * clearing it — callers can swallow this to distinguish a cancel from a failure. */
+export const STEP_UP_CANCELLED = "step_up_cancelled";
+
+/**
+ * A generic, dismissable two-factor STEP-UP modal — the front-end half of the
+ * `stepup.totp` gate. Stands in front of any key ISSUE/REVEAL action: enroll an
+ * authenticator (first time) or verify a code (this session), then the guarded
+ * action retries automatically. Not bound to any one key type — the multi-key +
+ * AI-provider hub reuses this exact modal.
+ */
+export function StepUpModal({
+  kind,
+  onCleared,
+  onClose,
+}: {
+  kind: "enroll" | "verify";
+  onCleared: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <div className="w-full max-w-[560px] rounded-2xl border border-line bg-panel p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2 text-[16px] font-bold text-ink">
+            <ShieldAlert size={18} className="text-brand" />
+            {kind === "enroll"
+              ? "Set up two-factor to reveal a key"
+              : "Verify to reveal a key"}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1 text-mut transition-colors hover:text-ink"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <p className="mt-1.5 text-[13.5px] text-mut">
+          {kind === "enroll"
+            ? "Revealing an API key requires an authenticator app. Set one up now — it takes about a minute, then your key is shown."
+            : "For your security, confirm a code from your authenticator app before the key is shown."}
+        </p>
+        <div className="mt-5">
+          {kind === "enroll" ? (
+            <EnrollFlow onDone={onCleared} />
+          ) : (
+            <VerifyForm onVerified={onCleared} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Wrap any secret-revealing action in a fresh-2FA step-up. `guard(fn)` runs `fn`;
+ * if the API answers with a 2FA challenge (403 totp_enrollment_required /
+ * totp_required), it shows {@link StepUpModal}, waits for the user to clear it,
+ * then retries `fn` once and resolves with its result. Dismissing the modal
+ * rejects with an Error whose message is {@link STEP_UP_CANCELLED}. Render the
+ * returned `modal` somewhere in the component.
+ *
+ * Generic by design: bridge keys use it today; the coming multi-key + AI-provider
+ * hub can guard its own issue/reveal calls with the same hook.
+ */
+export function useStepUpGuard() {
+  const [challenge, setChallenge] = useState<"enroll" | "verify" | null>(null);
+  const pending = useRef<{
+    retry: () => Promise<unknown>;
+    resolve: (v: unknown) => void;
+    reject: (e: unknown) => void;
+  } | null>(null);
+
+  const guard = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (e) {
+      const c = totpChallenge(e);
+      if (!c) throw e;
+      return new Promise<T>((resolve, reject) => {
+        pending.current = {
+          retry: fn,
+          resolve: (v) => resolve(v as T),
+          reject,
+        };
+        setChallenge(c);
+      });
+    }
+  }, []);
+
+  const onCleared = useCallback(async () => {
+    const p = pending.current;
+    pending.current = null;
+    setChallenge(null);
+    if (!p) return;
+    try {
+      p.resolve(await p.retry());
+    } catch (e) {
+      p.reject(e);
+    }
+  }, []);
+
+  const onClose = useCallback(() => {
+    const p = pending.current;
+    pending.current = null;
+    setChallenge(null);
+    p?.reject(new Error(STEP_UP_CANCELLED));
+  }, []);
+
+  const modal = challenge ? (
+    <StepUpModal kind={challenge} onCleared={onCleared} onClose={onClose} />
+  ) : null;
+
+  return { guard, modal };
 }
