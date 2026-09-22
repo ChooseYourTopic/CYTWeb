@@ -1387,10 +1387,15 @@ function BridgeKeysCard() {
         // User dismissed the 2FA prompt — no key issued, no error to show.
         return;
       }
+      const notEntitled =
+        e instanceof ApiError &&
+        e.status === 403 &&
+        e.message.includes("not_entitled");
       setMsg({
         ok: false,
-        text:
-          e instanceof ApiError && e.status === 422
+        text: notEntitled
+          ? "Create a topic first — a key grants a partner read access to your topics and customers."
+          : e instanceof ApiError && e.status === 422
             ? "Read-write is reserved until two-way sync ships — issue a read-only key."
             : "Couldn't issue that key. Please try again.",
       });
