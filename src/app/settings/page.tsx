@@ -28,7 +28,11 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { TwoFactorCard } from "@/components/security/TwoFactor";
+import {
+  TwoFactorCard,
+  useStepUpGuard,
+  STEP_UP_CANCELLED,
+} from "@/components/security/TwoFactor";
 import {
   cytapi,
   ApiError,
@@ -1341,6 +1345,9 @@ function BridgeKeysCard() {
   const [revoking, setRevoking] = useState<number | null>(null);
   const [minted, setMinted] = useState<BridgeKeyMint | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Revealing a key requires a fresh 2FA step-up — the guard prompts enroll/verify
+  // and retries the issue once cleared. Generic: any key type inherits this gate.
+  const { guard, modal: stepUpModal } = useStepUpGuard();
 
   const load = useCallback(async () => {
     try {
@@ -1364,14 +1371,22 @@ function BridgeKeysCard() {
     setMsg(null);
     try {
       // Read-only this release — omit scopes so the backend applies its read defaults.
-      const res = await cytapi.bridgeKeys.issue({
-        partner: p,
-        ...(name.trim() ? { name: name.trim() } : {}),
-      });
+      // Revealing the key is 2FA-gated: guard() runs the step-up (enroll/verify) on a
+      // 403 challenge and retries the issue once the user clears it.
+      const res = await guard(() =>
+        cytapi.bridgeKeys.issue({
+          partner: p,
+          ...(name.trim() ? { name: name.trim() } : {}),
+        }),
+      );
       setMinted(res);
       setName("");
       await load();
     } catch (e) {
+      if (e instanceof Error && e.message === STEP_UP_CANCELLED) {
+        // User dismissed the 2FA prompt — no key issued, no error to show.
+        return;
+      }
       setMsg({
         ok: false,
         text:
@@ -1423,7 +1438,7 @@ function BridgeKeysCard() {
       <Card
         icon={Plug}
         title="API Access — Empire Bridge"
-        desc="Issue scoped keys that let another Empire platform (like QuickerBiz) pull your topics and customers — one-way, read-only. Keys are shown once and can be revoked anytime."
+        desc="Issue scoped keys that let another Empire platform (like QuickerBiz) pull your topics and customers — one-way, read-only. Keys are shown once and can be revoked anytime. Issuing a key requires your two-factor code."
       >
         <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-line bg-panel2 px-3.5 py-3 text-[12.5px] text-mut">
           <Plug size={15} className="mt-0.5 shrink-0 text-brand" />
@@ -1613,6 +1628,9 @@ function BridgeKeysCard() {
           </div>
         </div>
       </Card>
+
+      {/* Fresh-2FA step-up prompt (shown when issuing a key needs verification). */}
+      {stepUpModal}
 
       {minted && (
         <RevealModal minted={minted} onClose={() => setMinted(null)} />
