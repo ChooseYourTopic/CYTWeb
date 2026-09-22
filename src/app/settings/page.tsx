@@ -1237,9 +1237,32 @@ function AiAccountCard({
 // behind two-way sync and the option is disabled. Keys are masked after mint;
 // one-click revoke. Never a secret is re-shown after the mint modal closes.
 
+// The apps a key can be issued FOR. QuickerBiz is the registered Empire Bridge
+// consumer today; "Other" lets an owner tag a key for any other integration/app by
+// its own slug — so DIFFERENT named keys can target DIFFERENT apps (C1). A key's
+// `partner` is its target-app tag; multiple named keys per app are supported.
+const OTHER_PARTNER = "__other__";
 const BRIDGE_PARTNERS: { slug: string; label: string }[] = [
   { slug: "quickerbiz", label: "QuickerBiz" },
+  { slug: OTHER_PARTNER, label: "Other integration / app…" },
 ];
+
+/** Friendly label for a partner slug (falls back to the raw slug for custom apps). */
+function partnerLabel(slug: string): string {
+  const known = BRIDGE_PARTNERS.find((p) => p.slug === slug && p.slug !== OTHER_PARTNER);
+  return known?.label ?? slug;
+}
+
+/** Group issued keys by their target-app slug, first-seen order preserved. */
+function groupKeysByApp(keys: BridgeKey[]): [string, BridgeKey[]][] {
+  const groups = new Map<string, BridgeKey[]>();
+  for (const k of keys) {
+    const arr = groups.get(k.partner) ?? [];
+    arr.push(k);
+    groups.set(k.partner, arr);
+  }
+  return Array.from(groups.entries());
+}
 
 /** A read-only value with a copy button (used in the one-time reveal modal). */
 function SecretRow({ label, value }: { label: string; value: string }) {
@@ -1309,8 +1332,8 @@ function RevealModal({
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>
             Copy these now — they are shown <span className="font-semibold">once</span> and
-            never again. Store them where {minted.key.partner} can reach them. If you lose
-            them, revoke this key and issue a new one.
+            never again. Store them where {partnerLabel(minted.key.partner)} can reach them. If
+            you lose them, revoke this key and issue a new one.
           </span>
         </div>
 
@@ -1339,6 +1362,8 @@ function BridgeKeysCard() {
   const [keys, setKeys] = useState<BridgeKey[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [partner, setPartner] = useState(BRIDGE_PARTNERS[0]?.slug ?? "");
+  // When "Other" is chosen, the target app is this custom slug (tags the key per app).
+  const [customPartner, setCustomPartner] = useState("");
   const [name, setName] = useState("");
   const [access, setAccess] = useState<AccessRight>("read");
   const [busy, setBusy] = useState(false);
@@ -1364,15 +1389,22 @@ function BridgeKeysCard() {
     load();
   }, [load]);
 
+  // The effective target-app slug: the dropdown choice, or the custom slug when "Other".
+  const targetPartner =
+    partner === OTHER_PARTNER
+      ? customPartner.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "-")
+      : partner.trim();
+
   async function issue() {
-    const p = partner.trim();
+    const p = targetPartner;
     if (!p || busy || access !== "read") return; // read-write is reserved (option disabled)
     setBusy(true);
     setMsg(null);
     try {
       // Read-only this release — omit scopes so the backend applies its read defaults.
       // Revealing the key is 2FA-gated: guard() runs the step-up (enroll/verify) on a
-      // 403 challenge and retries the issue once the user clears it.
+      // 403 challenge and retries the issue once the user clears it. Issuance is ADDITIVE
+      // — a new key for an app never revokes existing keys for that app (C1 multi-key).
       const res = await guard(() =>
         cytapi.bridgeKeys.issue({
           partner: p,
@@ -1471,63 +1503,75 @@ function BridgeKeysCard() {
               {loadErr ?? "No keys yet. Issue one below to connect a partner."}
             </p>
           ) : (
-            <ul className="grid gap-2">
-              {keys.map((k) => (
-                <li
-                  key={k.id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel2 px-3.5 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[14px] font-bold text-ink">
-                        {BRIDGE_PARTNERS.find((p) => p.slug === k.partner)?.label ??
-                          k.partner}
-                      </span>
-                      {k.name && (
-                        <span className="text-[12.5px] text-mut">· {k.name}</span>
-                      )}
-                      <span className="font-mono text-[12px] text-dim">{k.label}</span>
-                      {!k.live && (
-                        <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
-                          Expired
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {k.scopes.map((s) => (
-                        <span
-                          key={s}
-                          className="rounded-full border border-line px-2 py-0.5 font-mono text-[10.5px] text-mut"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-1 text-[11.5px] text-dim">
-                      {k.last_used_at
-                        ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
-                        : "Never used"}
-                      {k.expires_at
-                        ? ` · Expires ${new Date(k.expires_at).toLocaleDateString()}`
-                        : ""}
-                    </div>
+            // Grouped PER APP — each target integration gets its own labelled group,
+            // so many named keys across many apps stay legible (C1 multi-key per app).
+            <div className="grid gap-4">
+              {groupKeysByApp(keys).map(([slug, appKeys]) => (
+                <div key={slug}>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className="text-[13px] font-bold text-ink">
+                      {partnerLabel(slug)}
+                    </span>
+                    <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
+                      {appKeys.length} {appKeys.length === 1 ? "key" : "keys"}
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => revoke(k.id)}
-                    disabled={revoking === k.id}
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
-                  >
-                    {revoking === k.id ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                    Revoke
-                  </button>
-                </li>
+                  <ul className="grid gap-2">
+                    {appKeys.map((k) => (
+                      <li
+                        key={k.id}
+                        className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel2 px-3.5 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[13.5px] font-semibold text-ink">
+                              {k.name || "Unnamed key"}
+                            </span>
+                            <span className="font-mono text-[12px] text-dim">{k.label}</span>
+                            {!k.live && (
+                              <span className="rounded-full border border-line px-2 py-0.5 text-[10.5px] uppercase tracking-wide text-dim">
+                                Expired
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {k.scopes.map((s) => (
+                              <span
+                                key={s}
+                                className="rounded-full border border-line px-2 py-0.5 font-mono text-[10.5px] text-mut"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-1 text-[11.5px] text-dim">
+                            {k.last_used_at
+                              ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
+                              : "Never used"}
+                            {k.expires_at
+                              ? ` · Expires ${new Date(k.expires_at).toLocaleDateString()}`
+                              : ""}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => revoke(k.id)}
+                          disabled={revoking === k.id}
+                          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
+                        >
+                          {revoking === k.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                          Revoke
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
 
@@ -1535,7 +1579,7 @@ function BridgeKeysCard() {
         <div className="rounded-xl border border-line bg-panel2 p-4">
           <div className="mb-3 text-[13px] font-semibold text-ink">Issue a key</div>
           <div className="grid gap-3">
-            <Field label="Partner — the platform that will use this key">
+            <Field label="App — the integration that will use this key">
               <select
                 className="cyt-input"
                 value={partner}
@@ -1548,14 +1592,28 @@ function BridgeKeysCard() {
                 ))}
               </select>
             </Field>
-            <Field label="Name (optional) — a label to recognise this key later">
+            {partner === OTHER_PARTNER && (
+              <Field label="App identifier — a short slug for the target integration">
+                <input
+                  className="cyt-input font-mono"
+                  value={customPartner}
+                  onChange={(e) => setCustomPartner(e.target.value)}
+                  placeholder="e.g. venuetool, leadinterlink, my-internal-app"
+                />
+              </Field>
+            )}
+            <Field label="Name — a label to tell this app's keys apart (recommended)">
               <input
                 className="cyt-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. QuickerBiz production"
+                placeholder="e.g. Production, Staging, Data-warehouse sync"
               />
             </Field>
+            <p className="-mt-1 text-[11.5px] text-dim">
+              You can issue several keys for the same app — name each one so you can
+              recognise and revoke them independently.
+            </p>
 
             {/* Access-rights radio — read-only default; read-write disabled/reserved. */}
             <div>
@@ -1618,7 +1676,7 @@ function BridgeKeysCard() {
               <button
                 type="button"
                 onClick={issue}
-                disabled={busy || !partner.trim() || access !== "read"}
+                disabled={busy || !targetPartner || access !== "read"}
                 className="cyt-gradient-bg flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
               >
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
