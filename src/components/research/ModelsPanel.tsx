@@ -22,6 +22,7 @@ import {
   type LadderRung,
   type ProviderUsage,
 } from "@/lib/api";
+import { useStepUpGuard, STEP_UP_CANCELLED } from "@/components/security/TwoFactor";
 
 /** Format a USD cost compactly — sub-cent shows more precision. */
 function money(n: number): string {
@@ -88,6 +89,9 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
   const [busy, setBusy] = useState<"save" | "test" | "disconnect" | null>(null);
   const [confirmOff, setConfirmOff] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Connecting/replacing a key is 2FA step-up gated (generic stepup.totp): on a 403
+  // challenge the guard prompts enroll/verify and retries the save once cleared.
+  const { guard, modal: stepUpModal } = useStepUpGuard();
 
   const load = useCallback(async () => {
     try {
@@ -113,7 +117,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
     setBusy("save");
     setMsg(null);
     try {
-      const res = await cytapi.aiCredential.saveApiKey(k);
+      const res = await guard(() => cytapi.aiCredential.saveApiKey(k));
       setCred(res);
       setKeyInput("");
       setShowForm(false);
@@ -125,6 +129,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
           (resumed > 0 ? ` Resumed ${resumed} parked topic${resumed === 1 ? "" : "s"}.` : ""),
       });
     } catch (e) {
+      if (e instanceof Error && e.message === STEP_UP_CANCELLED) return; // dismissed — nothing saved
       setMsg({ ok: false, text: serverMessage(e, "Couldn't save that key — check it and try again.") });
     } finally {
       setBusy(null);
@@ -166,6 +171,7 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
   }
 
   return (
+    <>
     <div
       className={`rounded-2xl border bg-panel p-4 ${
         outOfCredits ? "border-[#4a2020]" : connected && !needsReauth ? "border-[#1f3d2e]" : needsReauth ? "border-[#3a3320]" : "border-line"
@@ -349,6 +355,8 @@ function AnthropicCredentialCard({ usage }: { usage?: ProviderUsage }) {
         </div>
       </div>
     </div>
+    {stepUpModal}
+    </>
   );
 }
 
@@ -377,6 +385,8 @@ function ModelTile({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const supported = !!model.provider;
   const active = !!connected;
+  // Provider key entry is 2FA step-up gated (generic stepup.totp).
+  const { guard, modal: stepUpModal } = useStepUpGuard();
 
   async function save() {
     const k = keyInput.trim();
@@ -384,12 +394,13 @@ function ModelTile({
     setBusy(true);
     setMsg(null);
     try {
-      await cytapi.aiCredential.saveApiKey(k, model.provider);
+      await guard(() => cytapi.aiCredential.saveApiKey(k, model.provider!));
       setKeyInput("");
       setOpen(false);
       setMsg({ ok: true, text: `${model.name} connected — it's now your active provider.` });
       onConnected();
     } catch (e) {
+      if (e instanceof Error && e.message === STEP_UP_CANCELLED) return; // dismissed — nothing saved
       setMsg({ ok: false, text: serverMessage(e, "Couldn't save that key — check it and try again.") });
     } finally {
       setBusy(false);
@@ -397,6 +408,7 @@ function ModelTile({
   }
 
   return (
+    <>
     <div className="flex items-start gap-3 rounded-2xl border border-line bg-panel p-4">
       <span
         className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[14px] font-extrabold text-white"
@@ -531,6 +543,8 @@ function ModelTile({
         )}
       </div>
     </div>
+    {stepUpModal}
+    </>
   );
 }
 

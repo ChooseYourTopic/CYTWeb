@@ -8,11 +8,9 @@ import {
   Loader2,
   User as UserIcon,
   SlidersHorizontal,
-  ShieldCheck,
   AlertTriangle,
   KeyRound,
   Link2,
-  Sparkles,
   Share2,
   Copy,
   Check,
@@ -33,11 +31,12 @@ import {
   useStepUpGuard,
   STEP_UP_CANCELLED,
 } from "@/components/security/TwoFactor";
+import { ModelsPanel } from "@/components/research/ModelsPanel";
+import { INTEGRATIONS } from "@/lib/integrations";
 import {
   cytapi,
   ApiError,
   type MeProfile,
-  type AiCredential,
   type ViewMode,
   type McpTokenStatus,
   type BridgeKey,
@@ -61,8 +60,6 @@ const TIMEZONES = [
   "Asia/Tokyo",
   "Australia/Sydney",
 ];
-
-type AiMode = "default" | "api_key" | "oauth";
 
 function Card({
   icon: Icon,
@@ -89,18 +86,13 @@ function Card({
 export default function SettingsPage() {
   const router = useRouter();
   const [me, setMe] = useState<MeProfile | null>(null);
-  const [cred, setCred] = useState<AiCredential | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [profile, credential] = await Promise.all([
-        cytapi.me(),
-        cytapi.aiCredential.get(),
-      ]);
+      const profile = await cytapi.me();
       setMe(profile);
-      setCred(credential);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         router.replace("/signin");
@@ -170,7 +162,7 @@ export default function SettingsPage() {
           {me && <PreferencesCard me={me} />}
           <ConnectionModeCard />
           <div id="ai-account" className="scroll-mt-24">
-            {cred && <AiAccountCard cred={cred} onChange={setCred} />}
+            <AiModelsCard />
           </div>
           <div id="api-access" className="scroll-mt-24">
             {me && <BridgeKeysCard />}
@@ -941,290 +933,22 @@ function ConnectionModeCard() {
   );
 }
 
-/* ------------------------------ AI account -------------------------------- */
-
-function AiAccountCard({
-  cred,
-  onChange,
-}: {
-  cred: AiCredential;
-  onChange: (c: AiCredential) => void;
-}) {
-  const current: AiMode = cred.connected
-    ? (cred.auth_type as AiMode)
-    : "default";
-  const [mode, setMode] = useState<AiMode>(current);
-  const [apiKey, setApiKey] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const needsReauth = cred.status === "needs_reauth";
-
-  async function useDefault() {
-    if (busy) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      if (cred.connected) await cytapi.aiCredential.disconnect();
-      onChange(await cytapi.aiCredential.get());
-      setMsg({ ok: true, text: "Using the house account (preview mode)." });
-    } catch {
-      setMsg({ ok: false, text: "Couldn't switch. Please try again." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveKey() {
-    const key = apiKey.trim();
-    if (!key || busy) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      onChange(await cytapi.aiCredential.saveApiKey(key));
-      setApiKey("");
-      setMsg({ ok: true, text: "Connected — your agents run on your account." });
-    } catch (e) {
-      setMsg({
-        ok: false,
-        text:
-          e instanceof ApiError && e.status === 422
-            ? "That doesn't look like a valid key."
-            : "Couldn't save that key.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function connectOauth() {
-    if (busy) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const { authorize_url } = await cytapi.aiCredential.oauthStart();
-      window.location.href = authorize_url;
-    } catch (e) {
-      setMsg({
-        ok: false,
-        text:
-          e instanceof ApiError && e.status === 501
-            ? "Account connect isn't available yet — use an API key."
-            : "Couldn't start the connection.",
-      });
-      setBusy(false);
-    }
-  }
-
-  async function test() {
-    if (busy) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      const r = await cytapi.aiCredential.validate();
-      onChange(await cytapi.aiCredential.get());
-      setMsg({ ok: true, text: r.message });
-    } catch (e) {
-      await cytapi.aiCredential
-        .get()
-        .then(onChange)
-        .catch(() => {});
-      setMsg({
-        ok: false,
-        text:
-          e instanceof ApiError && e.status === 422
-            ? "Anthropic rejected this key — replace it and test again."
-            : "Couldn't reach Anthropic to test the key.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnectCred() {
-    if (busy) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await cytapi.aiCredential.disconnect();
-      onChange(await cytapi.aiCredential.get());
-      setMode("default");
-      setMsg({ ok: true, text: "Disconnected — back on the house account." });
-    } catch {
-      setMsg({ ok: false, text: "Couldn't disconnect. Please try again." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const SEGMENTS: { key: AiMode; label: string; Icon: typeof KeyRound }[] = [
-    { key: "default", label: "Default", Icon: Sparkles },
-    { key: "api_key", label: "API key", Icon: KeyRound },
-    { key: "oauth", label: "OAuth", Icon: Link2 },
-  ];
-
+/* ---------------------- AI models & providers (hub) ----------------------- */
+// The AI-model provider surface, brought INTO the unified connectivity hub. Reuses
+// the existing multi-provider engine UI verbatim (<ModelsPanel/>): connect Claude /
+// Gemini / OpenAI / Grok with your own key, order the priority ladder (rung 1 = your
+// default model), see per-provider usage. Key entry is 2FA step-up gated inside
+// ModelsPanel. This replaces the old Anthropic-only "AI account" card — one place for
+// every model credential, no duplication.
+function AiModelsCard() {
   return (
     <Card
-      icon={ShieldCheck}
-      title="AI account"
-      desc="How your agents are powered. Switch between the house account, your own API key, or a connected account."
-    >
-      {/* Current status */}
-      <div
-        className={`mb-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] ${
-          needsReauth
-            ? "border-[#3a2f12] bg-[#1c160a] text-warn"
-            : cred.connected
-              ? "border-[#1f3d2e] bg-[#0e1c16] text-good"
-              : "border-line bg-panel2 text-mut"
-        }`}
-      >
-        {needsReauth ? (
-          <AlertTriangle size={14} />
-        ) : cred.connected ? (
-          <ShieldCheck size={14} />
-        ) : (
-          <Sparkles size={14} />
-        )}
-        {needsReauth
-          ? "Your connection expired — reconnect to keep running on your account."
-          : cred.connected
-            ? `On your ${cred.auth_type === "oauth" ? "connected account" : "API key"}${
-                cred.account_label ? ` · ${cred.account_label}` : ""
-              }`
-            : "On the house account — preview mode, billed to us."}
+      icon={Cpu}
+      title="AI models & providers"
+      desc="Connect the AI models that power your agents — bring your own Claude, Gemini, OpenAI or Grok key. Order them into a priority ladder (the top rung is your default; agents cascade down it when one runs out of credits). Connecting a key requires your two-factor code.">
+      <div className="-mx-5 -mb-5 -mt-1">
+        <ModelsPanel />
       </div>
-
-      {/* Connected: test + disconnect + last-checked. */}
-      {cred.connected && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {cred.auth_type === "api_key" && (
-            <button
-              onClick={test}
-              disabled={busy}
-              className="flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c] disabled:opacity-60"
-            >
-              {busy ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ShieldCheck size={14} />
-              )}
-              Test connection
-            </button>
-          )}
-          <button
-            onClick={disconnectCred}
-            disabled={busy}
-            className="flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
-          >
-            Disconnect
-          </button>
-          {cred.last_validated_at && (
-            <span className="text-[12px] text-dim">
-              Last checked {new Date(cred.last_validated_at).toLocaleString()}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Segmented switch */}
-      <div className="flex gap-1 rounded-xl border border-line bg-panel2 p-1">
-        {SEGMENTS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setMode(s.key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
-              mode === s.key
-                ? "bg-panel text-ink shadow-[0_0_0_1px_#31384c]"
-                : "text-mut hover:text-ink"
-            }`}
-          >
-            <s.Icon size={14} /> {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Panel per mode */}
-      <div className="mt-4">
-        {mode === "default" && (
-          <div>
-            <p className="text-[13px] text-mut">
-              Your topics run on our house account in preview mode. Switch to your
-              own key or account to run live on your bill.
-            </p>
-            <button
-              onClick={useDefault}
-              disabled={busy || (!cred.connected && current === "default")}
-              className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-panel2 px-4 py-2 text-[14px] font-semibold text-ink transition-colors hover:border-[#31384c] disabled:opacity-60"
-            >
-              {busy ? <Loader2 size={15} className="animate-spin" /> : null}
-              {current === "default" ? "Currently on default" : "Use default"}
-            </button>
-          </div>
-        )}
-
-        {mode === "api_key" && (
-          <div>
-            <p className="text-[13px] text-mut">
-              Paste your own Anthropic API key. Stored encrypted, never shown again.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <input
-                type="password"
-                autoComplete="off"
-                className="cyt-input"
-                placeholder="sk-ant-…"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveKey();
-                }}
-              />
-              <button
-                onClick={saveKey}
-                disabled={busy || !apiKey.trim()}
-                className="cyt-gradient-bg flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
-              >
-                {busy ? <Loader2 size={15} className="animate-spin" /> : null}
-                {current === "api_key" ? "Replace key" : "Connect key"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {mode === "oauth" && (
-          <div>
-            <p className="text-[13px] text-mut">
-              Connect through a secure sign-in — no keys to copy. Your usage is
-              billed to your account.
-            </p>
-            <button
-              onClick={connectOauth}
-              disabled={busy || cred.oauth_available === false}
-              className="cyt-gradient-bg mt-3 flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold text-bg disabled:opacity-60"
-            >
-              {busy ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Link2 size={15} />
-              )}
-              {current === "oauth" ? "Reconnect account" : "Connect account"}
-            </button>
-            {cred.oauth_available === false && (
-              <p className="mt-2 text-[12px] text-dim">
-                Account connect isn&apos;t enabled on this server yet — use an API
-                key.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {msg && (
-        <p className={`mt-3 text-[13px] ${msg.ok ? "text-good" : "text-bad"}`}>
-          {msg.text}
-        </p>
-      )}
     </Card>
   );
 }
@@ -1237,13 +961,19 @@ function AiAccountCard({
 // behind two-way sync and the option is disabled. Keys are masked after mint;
 // one-click revoke. Never a secret is re-shown after the mint modal closes.
 
-// The apps a key can be issued FOR. QuickerBiz is the registered Empire Bridge
-// consumer today; "Other" lets an owner tag a key for any other integration/app by
-// its own slug — so DIFFERENT named keys can target DIFFERENT apps (C1). A key's
-// `partner` is its target-app tag; multiple named keys per app are supported.
+// The platform a key is issued FOR — SOURCED FROM THE INTEGRATIONS DIRECTORY (/integrations)
+// so every issued credential is associated with a specific platform the owner intends to use
+// it with (Tracy 2026-09-22). QuickerBiz (the registered Empire Bridge consumer) is featured
+// first; then the full integrations directory; then "Other" for anything unlisted (tagged by a
+// custom slug). A key's `partner` is that platform tag; multiple named keys per platform are
+// supported (C1).
 const OTHER_PARTNER = "__other__";
 const BRIDGE_PARTNERS: { slug: string; label: string }[] = [
   { slug: "quickerbiz", label: "QuickerBiz" },
+  ...INTEGRATIONS.filter((i) => i.key !== "quickerbiz").map((i) => ({
+    slug: i.key,
+    label: i.name,
+  })),
   { slug: OTHER_PARTNER, label: "Other integration / app…" },
 ];
 
@@ -1579,7 +1309,7 @@ function BridgeKeysCard() {
         <div className="rounded-xl border border-line bg-panel2 p-4">
           <div className="mb-3 text-[13px] font-semibold text-ink">Issue a key</div>
           <div className="grid gap-3">
-            <Field label="App — the integration that will use this key">
+            <Field label="Platform — the integration this key is for (from your integrations directory)">
               <select
                 className="cyt-input"
                 value={partner}
