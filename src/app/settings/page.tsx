@@ -160,6 +160,15 @@ export default function SettingsPage() {
           {me && <PasswordCard me={me} />}
           {me && <TwoFactorCard />}
           {me && <PreferencesCard me={me} />}
+
+          {/* ===== Unified "API keys & connectivity" hub (C3) ===================
+              One coherent place for every connectivity credential on the profile:
+              how agents are powered, the AI-model provider keys (Claude/Gemini/
+              OpenAI/Grok + priority ladder), and the outbound bridge/partner keys
+              that let other platforms pull this account's data. ================ */}
+          <div id="connectivity" className="scroll-mt-24">
+            <ConnectivityHubHeader />
+          </div>
           <ConnectionModeCard />
           <div id="ai-account" className="scroll-mt-24">
             <AiModelsCard />
@@ -629,6 +638,41 @@ function PreferencesCard({ me }: { me: MeProfile }) {
   );
 }
 
+/* ----------------- Unified connectivity hub header (C3) ------------------- */
+// The single banner that introduces the "API keys & connectivity" hub — the one
+// place that gathers every connectivity credential on the profile: how agents are
+// powered, the AI-model provider keys, and the outbound bridge/partner keys.
+function ConnectivityHubHeader() {
+  return (
+    <div className="rounded-2xl border border-line bg-panel2 p-5">
+      <div className="flex items-center gap-2 text-[17px] font-bold tracking-[-0.3px] text-ink">
+        <Plug size={18} className="text-brand" /> API keys &amp; connectivity
+      </div>
+      <p className="mt-1 text-[13px] text-mut">
+        One place for every credential on your profile — how your agents are powered,
+        the AI-model provider keys that run them (Claude, Gemini, OpenAI, Grok), and
+        the bridge keys that let other platforms connect to your data. Every key is
+        tagged to the platform it&apos;s for, and issuing or connecting one is protected
+        by your two-factor code.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2 text-[12px]">
+        <a
+          href="#ai-account"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 font-semibold text-ink transition-colors hover:border-[#31384c]"
+        >
+          <Cpu size={13} className="text-brand" /> AI models &amp; providers
+        </a>
+        <a
+          href="#api-access"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 font-semibold text-ink transition-colors hover:border-[#31384c]"
+        >
+          <KeyRound size={13} className="text-brand" /> Bridge &amp; partner keys
+        </a>
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------- Connection mode (E22) ------------------------ */
 // "How your agents run" — the higher-level choice of HOW a topic's agents are
 // powered, distinct from WHICH credential (the AI account card below). Three
@@ -831,14 +875,14 @@ function ConnectionModeCard() {
             </div>
             <p className="text-[12.5px] text-mut">
               The platform runs your agents for you, server-side, on your own
-              Anthropic API key — pay-as-you-go. Add or replace the key in the AI
-              account section below.
+              provider API key — pay-as-you-go. Add or replace it in the AI models
+              &amp; providers section below.
             </p>
             <a
               href="#ai-account"
               className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
             >
-              <KeyRound size={14} /> Manage your API key
+              <KeyRound size={14} /> Manage your model keys
             </a>
           </div>
         )}
