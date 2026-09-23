@@ -1058,6 +1058,30 @@ export type BridgeKeyMint = {
   key: BridgeKey;
 };
 
+// One grantable topic module (a section/tab) in the collaborator grant UI (#5 C2).
+export type ModuleCatalogItem = { slug: string; label: string };
+
+// A collaborator bound to a topic the licensee owns, plus their per-module grants
+// (#5 C2). `modules` is the authoritative granted set; a revoked binding is kept
+// (audit) with `active:false`. Never carries secret material.
+export type Collaborator = {
+  id: number;
+  user_id: number;
+  name: string | null;
+  email: string | null;
+  modules: string[];
+  active: boolean;
+  revoked_at: string | null;
+  granted_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type CollaboratorsResponse = {
+  modules_catalog: ModuleCatalogItem[];
+  collaborators: Collaborator[];
+};
+
 // Per-topic integration connection status — one connected provider. Secrets are
 // never returned; `masked_key` (when the backend provides it) is a display-only
 // masked identifier for the connected credential, never the secret itself.
@@ -2179,6 +2203,29 @@ export const cytapi = {
       client.post<BridgeKeyMint>("/me/bridge-keys", payload),
     revoke: (id: number) =>
       client.del<{ revoked: boolean }>(`/me/bridge-keys/${id}`),
+  },
+
+  // Fine-grained per-module collaborator grants on a topic the licensee owns
+  // (#5 C2). `list` returns the topic's collaborators + the module catalog; `grant`
+  // binds a CYT user (by email) with an initial module set; `setModules` replaces a
+  // binding's grants (grant/revoke per-module); `revoke` fails a binding closed.
+  // `grant` + `setModules` are 2FA step-up gated server-side (run them through the
+  // step-up guard). Owner-scoped: a topic you don't own 404s.
+  collaborators: {
+    list: (topicId: number | string) =>
+      client.get<CollaboratorsResponse>(`/me/topics/${topicId}/collaborators`),
+    grant: (topicId: number | string, payload: { email: string; modules: string[] }) =>
+      client.post<{ collaborator: Collaborator }>(
+        `/me/topics/${topicId}/collaborators`,
+        payload,
+      ),
+    setModules: (topicId: number | string, id: number, modules: string[]) =>
+      client.put<{ collaborator: Collaborator }>(
+        `/me/topics/${topicId}/collaborators/${id}`,
+        { modules },
+      ),
+    revoke: (topicId: number | string, id: number) =>
+      client.del<{ revoked: boolean }>(`/me/topics/${topicId}/collaborators/${id}`),
   },
 
   // Bring-your-own AI credential — connect an API key or an OAuth account so the
