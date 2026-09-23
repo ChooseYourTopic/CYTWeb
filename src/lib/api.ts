@@ -1047,6 +1047,7 @@ export type BridgeKey = {
   created_at: string | null; // #3 C1 — issued WHEN (date + time of mint)
   issued_by: { id: number; name: string | null } | null; // #3 C1 — issued BY WHOM
   last_used_at: string | null;
+  use_count: number; // #3 C2 — how many authenticated bridge calls have used this key
   expires_at: string | null;
   revoked_at: string | null; // #3 C1 — when revoked (history rows only; null while active)
   status: "live" | "revoked" | "expired"; // #3 C1 — lifecycle state

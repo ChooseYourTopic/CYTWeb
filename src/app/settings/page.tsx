@@ -1370,6 +1370,7 @@ function BridgeKeysCard() {
                             {k.last_used_at
                               ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
                               : "Never used"}
+                            {` · ${k.use_count} use${k.use_count === 1 ? "" : "s"}`}
                             {k.expires_at
                               ? ` · Expires ${new Date(k.expires_at).toLocaleDateString()}`
                               : ""}
@@ -1463,6 +1464,13 @@ function BridgeKeysCard() {
                         {k.revoked_at
                           ? ` · Revoked ${new Date(k.revoked_at).toLocaleString()}`
                           : ""}
+                      </div>
+                      {/* #3 C2 — usage record: last-used timestamp + aggregate use-count. */}
+                      <div className="mt-1 text-[11.5px] text-dim">
+                        {k.last_used_at
+                          ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
+                          : "Never used"}
+                        {` · ${k.use_count} use${k.use_count === 1 ? "" : "s"}`}
                       </div>
                     </li>
                   ))}
