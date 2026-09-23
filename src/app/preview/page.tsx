@@ -215,6 +215,11 @@ export default function PreviewPage() {
         <p className="mt-1 text-center text-[12px] text-dim">
           Scroll the belt sideways to follow the whole line →
         </p>
+        <p className="mt-4 text-center text-[13px]">
+          <Link href="/preview/status" className="font-semibold text-brand transition-colors hover:text-ink">
+            See the live build status board →
+          </Link>
+        </p>
       </section>
 
       {/* CTA */}
