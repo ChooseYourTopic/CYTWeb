@@ -23,6 +23,8 @@ import {
   Trash2,
   Lock,
   X,
+  History,
+  ChevronDown,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -1134,6 +1136,22 @@ function RevealModal({
 
 type AccessRight = "read" | "readwrite";
 
+/** #3 C1 — a small lifecycle chip for a key in the issuance history (live/revoked/expired). */
+function StatusBadge({ status }: { status: BridgeKey["status"] }) {
+  const styles: Record<BridgeKey["status"], string> = {
+    live: "border-[#1f3a2a] text-good",
+    revoked: "border-[#3a1a1a] text-bad",
+    expired: "border-line text-dim",
+  };
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10.5px] uppercase tracking-wide ${styles[status]}`}
+    >
+      {status}
+    </span>
+  );
+}
+
 function BridgeKeysCard() {
   const [keys, setKeys] = useState<BridgeKey[] | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -1146,6 +1164,10 @@ function BridgeKeysCard() {
   const [revoking, setRevoking] = useState<number | null>(null);
   const [minted, setMinted] = useState<BridgeKeyMint | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // #3 C1 — generation history (all keys incl. revoked/expired), lazy-loaded on open.
+  const [history, setHistory] = useState<BridgeKey[] | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyErr, setHistoryErr] = useState<string | null>(null);
   // Revealing a key requires a fresh 2FA step-up — the guard prompts enroll/verify
   // and retries the issue once cleared. Generic: any key type inherits this gate.
   const { guard, modal: stepUpModal } = useStepUpGuard();
@@ -1161,9 +1183,26 @@ function BridgeKeysCard() {
     }
   }, []);
 
+  // #3 C1 — the full issuance history, INCLUDING revoked keys (the active list hides them).
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await cytapi.bridgeKeys.history();
+      setHistory(res.keys);
+      setHistoryErr(null);
+    } catch {
+      setHistory([]);
+      setHistoryErr("Couldn't load your key history.");
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  // Keep the history fresh once it's open (a new mint or a revoke changes it).
+  useEffect(() => {
+    if (showHistory) loadHistory();
+  }, [showHistory, loadHistory, keys]);
 
   // The effective target-app slug: the dropdown choice, or the custom slug when "Other".
   const targetPartner =
@@ -1320,6 +1359,13 @@ function BridgeKeysCard() {
                               </span>
                             ))}
                           </div>
+                          {/* #3 C1 — per-key generation record: issued by whom + when. */}
+                          <div className="mt-1 text-[11.5px] text-dim">
+                            Issued by {k.issued_by?.name ?? "—"}
+                            {k.created_at
+                              ? ` · ${new Date(k.created_at).toLocaleString()}`
+                              : ""}
+                          </div>
                           <div className="mt-1 text-[11.5px] text-dim">
                             {k.last_used_at
                               ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
@@ -1347,6 +1393,81 @@ function BridgeKeysCard() {
                   </ul>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* #3 C1 — generation history (includes revoked keys). Collapsed by default; the
+            active list above shows only live keys, this shows the full issuance record. */}
+        <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex w-full items-center justify-between rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-left transition-colors hover:border-[#31384c]"
+            aria-expanded={showHistory}
+          >
+            <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+              <History size={14} className="text-brand" /> Issuance history
+              <span className="text-[11.5px] font-normal text-dim">
+                — every key you&apos;ve issued, including revoked
+              </span>
+            </span>
+            <ChevronDown
+              size={16}
+              className={`shrink-0 text-mut transition-transform ${showHistory ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {showHistory && (
+            <div className="mt-2">
+              {history == null ? (
+                <div className="flex items-center gap-2 px-1 py-2 text-[13px] text-mut">
+                  <Loader2 size={14} className="animate-spin" /> Loading history…
+                </div>
+              ) : history.length === 0 ? (
+                <p className="rounded-xl border border-line bg-panel2 px-3 py-3 text-[13px] text-mut">
+                  {historyErr ?? "No keys have been issued yet."}
+                </p>
+              ) : (
+                <ul className="grid gap-2">
+                  {history.map((k) => (
+                    <li
+                      key={k.id}
+                      className="rounded-xl border border-line bg-panel2 px-3.5 py-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[13.5px] font-semibold text-ink">
+                          {k.name || "Unnamed key"}
+                        </span>
+                        <span className="text-[12px] text-mut">
+                          {partnerLabel(k.partner)}
+                        </span>
+                        <span className="font-mono text-[12px] text-dim">{k.label}</span>
+                        <StatusBadge status={k.status} />
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {k.scopes.map((s) => (
+                          <span
+                            key={s}
+                            className="rounded-full border border-line px-2 py-0.5 font-mono text-[10.5px] text-mut"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="mt-1 text-[11.5px] text-dim">
+                        Issued by {k.issued_by?.name ?? "—"}
+                        {k.created_at
+                          ? ` · ${new Date(k.created_at).toLocaleString()}`
+                          : ""}
+                        {k.revoked_at
+                          ? ` · Revoked ${new Date(k.revoked_at).toLocaleString()}`
+                          : ""}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </div>

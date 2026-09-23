@@ -1044,9 +1044,12 @@ export type BridgeKey = {
   name: string | null;
   label: string | null;
   scopes: string[];
-  created_at: string | null;
+  created_at: string | null; // #3 C1 — issued WHEN (date + time of mint)
+  issued_by: { id: number; name: string | null } | null; // #3 C1 — issued BY WHOM
   last_used_at: string | null;
   expires_at: string | null;
+  revoked_at: string | null; // #3 C1 — when revoked (history rows only; null while active)
+  status: "live" | "revoked" | "expired"; // #3 C1 — lifecycle state
   live: boolean;
 };
 
@@ -2199,6 +2202,9 @@ export const cytapi = {
   // closed. Owner-scoped: only the caller's own keys.
   bridgeKeys: {
     list: () => client.get<{ keys: BridgeKey[] }>("/me/bridge-keys"),
+    // #3 C1 — full generation history: every key ever issued, INCLUDING revoked +
+    // expired, newest first, each with issued-by/when + lifecycle status.
+    history: () => client.get<{ keys: BridgeKey[] }>("/me/bridge-keys/history"),
     issue: (payload: { partner: string; name?: string; scopes?: string[] }) =>
       client.post<BridgeKeyMint>("/me/bridge-keys", payload),
     revoke: (id: number) =>
