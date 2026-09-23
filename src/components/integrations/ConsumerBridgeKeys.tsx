@@ -265,6 +265,7 @@ export function ConsumerBridgeKeys({
                       {k.last_used_at
                         ? `Last used ${new Date(k.last_used_at).toLocaleString()}`
                         : "Never used"}
+                      {` · ${k.use_count} use${k.use_count === 1 ? "" : "s"}`}
                       {k.expires_at
                         ? ` · Expires ${new Date(k.expires_at).toLocaleDateString()}`
                         : ""}
