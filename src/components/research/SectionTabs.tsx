@@ -84,10 +84,17 @@ export function SectionTabs() {
   const newCounts = useResearchStore((s) => s.newCounts);
   const setActive = useResearchStore((s) => s.setActiveSection);
   const viewMode = useResearchStore((s) => s.viewMode);
+  const restrictSections = useResearchStore((s) => s.restrictSections);
+  const grantedSections = useResearchStore((s) => s.grantedSections);
 
-  // Basic = essentials only; Standard = the core set; Expert (advanced) = every tab.
-  const visible =
-    viewMode === "advanced"
+  // #5 collaborator tab-hiding: a collaborator sees ONLY the module tabs their
+  // binding grants (from the grant-filtered `sections` the API returns) — never
+  // the owner's full viewMode shell. This matches the section() gate exactly, so
+  // there are no dead tabs that would 403. Owner/staff fall through to viewMode.
+  const visible = restrictSections
+    ? SECTIONS.filter((s) => grantedSections.includes(s.key))
+    : // Basic = essentials only; Standard = the core set; Expert = every tab.
+      viewMode === "advanced"
       ? SECTIONS
       : viewMode === "basic"
         ? BASIC_SECTIONS.flatMap((k) => {

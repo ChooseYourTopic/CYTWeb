@@ -439,6 +439,11 @@ export type TopicOverview = {
     business_type?: string | null;
     industry?: string | null;
   };
+  // #5 collaborator tab-hiding: the viewer's role on this topic and the module
+  // sections they're granted (grant-filtered server-side). A collaborator's tab
+  // shell is restricted to `sections`; owner/staff see everything. Fail-closed.
+  role?: TopicRole;
+  sections?: SectionKey[];
 };
 
 /* --------------------- KPI-tile drill-down (modal) types ------------------- */
@@ -942,7 +947,19 @@ export type MyTopic = {
   // Tamper-evident handle (owner + license bound). Sent back as X-Topic-Signature
   // so the topic page validates itself, not just its numeric id.
   access_sig?: string;
+  // #5 collaborator navigation: true when this topic is SHARED with the user (an
+  // active collaborator binding on a topic they don't own) rather than owned.
+  shared?: boolean;
+  // The viewer's role on this topic: "licensee" (owner) | "admin" | "support" |
+  // "collaborator". Owned topics are always "licensee".
+  role?: TopicRole;
+  // For a shared topic, the module slugs this collaborator is granted (drives the
+  // "N modules" hint on the shared-topic card). Absent/empty on owned topics.
+  modules?: string[];
 };
+
+/** A user's role WITHIN one topic — mirrors the CYTAPI User::ROLE_* hierarchy. */
+export type TopicRole = "licensee" | "admin" | "support" | "collaborator";
 
 /** Response from pausing/resuming a project (soft shutdown + checkpointed resume). */
 export type PauseResult = {
@@ -1863,6 +1880,11 @@ export const cytapi = {
       kpis: raw?.kpis ?? {},
       spark: raw?.spark ?? [],
       items,
+      // #5 collaborator tab-hiding — the viewer's role + grant-filtered sections.
+      role: raw?.role ?? undefined,
+      sections: Array.isArray(raw?.sections)
+        ? (raw.sections as SectionKey[])
+        : undefined,
     };
   },
   section: async (

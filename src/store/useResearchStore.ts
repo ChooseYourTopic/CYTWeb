@@ -12,6 +12,12 @@ type ResearchState = {
   lastSeq: number;
   // Dashboard density: standard = core five tabs, advanced = every tab.
   viewMode: ViewMode;
+  // #5 collaborator tab-hiding: when true (viewer is a collaborator on a topic
+  // they don't own), the tab shell is restricted to `grantedSections` — the
+  // module tabs their binding allows — instead of the viewMode density. Owner/
+  // staff leave this false and keep the full viewMode-driven tab set.
+  restrictSections: boolean;
+  grantedSections: SectionKey[];
 
   setActiveSection: (s: SectionKey) => void;
   setWsConnected: (c: boolean) => void;
@@ -19,6 +25,7 @@ type ResearchState = {
   markSectionRead: (s: SectionKey) => void;
   setLastSeq: (n: number) => void;
   setViewMode: (m: ViewMode) => void;
+  setSectionGrant: (restrict: boolean, granted: SectionKey[]) => void;
 };
 
 export const useResearchStore = create<ResearchState>((set) => ({
@@ -27,6 +34,8 @@ export const useResearchStore = create<ResearchState>((set) => ({
   newCounts: {},
   lastSeq: 0,
   viewMode: "standard",
+  restrictSections: false,
+  grantedSections: [],
 
   setActiveSection: (s) =>
     set((state) => ({
@@ -52,4 +61,7 @@ export const useResearchStore = create<ResearchState>((set) => ({
     set((state) => ({ lastSeq: Math.max(state.lastSeq, n) })),
 
   setViewMode: (m) => set({ viewMode: m }),
+
+  setSectionGrant: (restrict, granted) =>
+    set({ restrictSections: restrict, grantedSections: granted }),
 }));
