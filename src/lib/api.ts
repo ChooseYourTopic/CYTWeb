@@ -1054,6 +1054,23 @@ export type BridgeKey = {
   live: boolean;
 };
 
+// #3 C3 — one recorded USE of a bridge key: when it was used, the resource
+// (bridge endpoint/path accessed) and the caller IP. Secret-free, newest-first.
+export type BridgeKeyActivity = {
+  id: number;
+  resource: string | null;
+  source_ip: string | null;
+  created_at: string | null;
+};
+
+// #3 C3 — the per-key activity drill-in payload: the aggregate use-count (C2)
+// alongside the recent per-use detail rows (capped/newest-first).
+export type BridgeKeyActivityResult = {
+  key_id: number;
+  use_count: number;
+  activity: BridgeKeyActivity[];
+};
+
 // The one-time mint response — `api_key` + `signing_secret` are the full
 // plaintext, shown once and never returned again; `key` is the masked row.
 export type BridgeKeyMint = {
@@ -2206,6 +2223,12 @@ export const cytapi = {
     // #3 C1 — full generation history: every key ever issued, INCLUDING revoked +
     // expired, newest first, each with issued-by/when + lifecycle status.
     history: () => client.get<{ keys: BridgeKey[] }>("/me/bridge-keys/history"),
+    // #3 C3 — per-key activity drill-in: recent authenticated uses of ONE key
+    // (timestamp · resource · IP), owner-scoped + secret-free, newest first.
+    activity: (id: number, limit?: number) =>
+      client.get<BridgeKeyActivityResult>(
+        `/me/bridge-keys/${id}/activity${limit ? `?limit=${limit}` : ""}`,
+      ),
     issue: (payload: { partner: string; name?: string; scopes?: string[] }) =>
       client.post<BridgeKeyMint>("/me/bridge-keys", payload),
     revoke: (id: number) =>

@@ -25,6 +25,7 @@ import {
   X,
   History,
   ChevronDown,
+  Activity,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -47,6 +48,7 @@ import {
   type ViewMode,
   type McpTokenStatus,
   type BridgeKey,
+  type BridgeKeyActivity,
   type BridgeKeyMint,
   type MyTopic,
   type Collaborator,
@@ -1168,6 +1170,11 @@ function BridgeKeysCard() {
   const [history, setHistory] = useState<BridgeKey[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [historyErr, setHistoryErr] = useState<string | null>(null);
+  // #3 C3 — per-key activity drill-in. One key expanded at a time; its recent uses
+  // (timestamp · resource · IP) are lazy-loaded on expand. null activity = loading.
+  const [activityFor, setActivityFor] = useState<number | null>(null);
+  const [activity, setActivity] = useState<BridgeKeyActivity[] | null>(null);
+  const [activityErr, setActivityErr] = useState<string | null>(null);
   // Revealing a key requires a fresh 2FA step-up — the guard prompts enroll/verify
   // and retries the issue once cleared. Generic: any key type inherits this gate.
   const { guard, modal: stepUpModal } = useStepUpGuard();
@@ -1194,6 +1201,27 @@ function BridgeKeysCard() {
       setHistoryErr("Couldn't load your key history.");
     }
   }, []);
+
+  // #3 C3 — expand/collapse a key's activity drill-in and lazy-load its recent uses.
+  const toggleActivity = useCallback(
+    async (id: number) => {
+      if (activityFor === id) {
+        setActivityFor(null); // collapse the currently-open key
+        return;
+      }
+      setActivityFor(id);
+      setActivity(null); // loading
+      setActivityErr(null);
+      try {
+        const res = await cytapi.bridgeKeys.activity(id);
+        setActivity(res.activity);
+      } catch {
+        setActivity([]);
+        setActivityErr("Couldn't load this key's activity.");
+      }
+    },
+    [activityFor],
+  );
 
   useEffect(() => {
     load();
@@ -1376,19 +1404,72 @@ function BridgeKeysCard() {
                               : ""}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => revoke(k.id)}
-                          disabled={revoking === k.id}
-                          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
-                        >
-                          {revoking === k.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={14} />
-                          )}
-                          Revoke
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {/* #3 C3 — per-key activity drill-in toggle. */}
+                          <button
+                            type="button"
+                            onClick={() => toggleActivity(k.id)}
+                            aria-expanded={activityFor === k.id}
+                            className="flex items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-[#31384c]"
+                          >
+                            <Activity size={14} className="text-brand" />
+                            Activity
+                            <ChevronDown
+                              size={14}
+                              className={`text-mut transition-transform ${activityFor === k.id ? "rotate-180" : ""}`}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => revoke(k.id)}
+                            disabled={revoking === k.id}
+                            className="flex items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-[13px] font-semibold text-bad transition-colors hover:border-[#3a1a1a] disabled:opacity-60"
+                          >
+                            {revoking === k.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                            Revoke
+                          </button>
+                        </div>
+
+                        {/* #3 C3 — expanded per-use activity: timestamp · resource · IP,
+                            newest first, owner-scoped + secret-free. */}
+                        {activityFor === k.id && (
+                          <div className="w-full border-t border-line pt-3">
+                            {activity == null ? (
+                              <div className="flex items-center gap-2 text-[13px] text-mut">
+                                <Loader2 size={14} className="animate-spin" /> Loading activity…
+                              </div>
+                            ) : activity.length === 0 ? (
+                              <p className="text-[13px] text-mut">
+                                {activityErr ?? "No recorded uses yet — this key hasn't been used."}
+                              </p>
+                            ) : (
+                              <ul className="grid gap-1.5">
+                                {activity.map((a) => (
+                                  <li
+                                    key={a.id}
+                                    className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11.5px]"
+                                  >
+                                    <span className="tabular-nums text-dim">
+                                      {a.created_at
+                                        ? new Date(a.created_at).toLocaleString()
+                                        : "—"}
+                                    </span>
+                                    <span className="font-mono text-mut">
+                                      {a.resource ?? "—"}
+                                    </span>
+                                    <span className="font-mono text-dim">
+                                      {a.source_ip ?? "—"}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
