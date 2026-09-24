@@ -37,7 +37,7 @@ import { useSectionData } from "@/hooks/useSectionData";
 import { useFinanceSummary } from "@/hooks/useFinanceSummary";
 import { useAgentStatus } from "@/hooks/useAgentStatus";
 import { useResearchStore } from "@/store/useResearchStore";
-import { cytapi, type TopicOverview, type ViewMode } from "@/lib/api";
+import { cytapi, type TopicOverview, type ViewMode, type SectionKey } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -177,6 +177,9 @@ export function ResearchDashboard({
   fallbackTopic?: string;
 }) {
   const active = useResearchStore((s) => s.activeSection);
+  const restrictSections = useResearchStore((s) => s.restrictSections);
+  const grantedSections = useResearchStore((s) => s.grantedSections);
+  const setSectionGrant = useResearchStore((s) => s.setSectionGrant);
 
   // Paused (soft-shutdown) state is server-owned. `pausedState` is null until the
   // overview loads (or a toggle sets it optimistically); a paused project halts
@@ -270,6 +273,20 @@ export function ResearchDashboard({
     setActive("overview");
   }, [topicId, setActive]);
 
+  // #5 collaborator tab-hiding: once the overview loads, push the viewer's role +
+  // grant-filtered sections into the store so SectionTabs restricts a
+  // collaborator to only their granted module tabs (owner/staff unaffected).
+  // Depend on primitives (role + a stable join key) so it doesn't churn on poll.
+  const overviewRole = overview?.role;
+  const grantKey = (overview?.sections ?? []).join(",");
+  useEffect(() => {
+    if (overviewRole === undefined) return; // not loaded yet — keep full shell
+    const granted = grantKey ? (grantKey.split(",") as SectionKey[]) : [];
+    setSectionGrant(overviewRole === "collaborator", granted);
+  }, [overviewRole, grantKey, setSectionGrant]);
+
+  const isCollaborator = overviewRole === "collaborator";
+
   // Standard vs Expert view — seeded from the user's saved preference.
   const viewMode = useResearchStore((s) => s.viewMode);
   const setViewMode = useResearchStore((s) => s.setViewMode);
@@ -288,8 +305,21 @@ export function ResearchDashboard({
     };
   }, [setViewMode]);
 
-  // If the active tab is hidden in the current view, fall back to Overview.
+  // If the active tab is hidden in the current view, fall back to a visible one.
   useEffect(() => {
+    // Collaborator: the visible set is the granted module tabs, not the viewMode
+    // shell. If the active tab isn't granted, fall back to Overview when granted,
+    // else the first granted tab.
+    if (restrictSections) {
+      if (grantedSections.length && !grantedSections.includes(active)) {
+        setActive(
+          grantedSections.includes("overview")
+            ? "overview"
+            : grantedSections[0],
+        );
+      }
+      return;
+    }
     const allowed =
       viewMode === "advanced"
         ? null
@@ -299,7 +329,7 @@ export function ResearchDashboard({
     if (allowed && !allowed.includes(active)) {
       setActive("overview");
     }
-  }, [viewMode, active, setActive]);
+  }, [restrictSections, grantedSections, viewMode, active, setActive]);
 
   async function changeViewMode(next: ViewMode) {
     if (next === viewMode) return;
@@ -360,12 +390,19 @@ export function ResearchDashboard({
         </Link>
 
         <div className="flex items-center gap-2">
-          <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
-          <ProjectPauseToggle
-            paused={paused}
-            busy={pauseBusy}
-            onToggle={togglePause}
-          />
+          {/* Owner-only controls: a collaborator (viewing a shared topic they
+              don't own) can't change the view density or pause someone else's
+              project — hide these so there are no dead controls. */}
+          {!isCollaborator && (
+            <>
+              <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
+              <ProjectPauseToggle
+                paused={paused}
+                busy={pauseBusy}
+                onToggle={togglePause}
+              />
+            </>
+          )}
           {/* Back to the home profile to browse or search for other topics */}
           <Link
             href="/dashboard"
@@ -430,19 +467,22 @@ export function ResearchDashboard({
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={togglePause}
-                  disabled={pauseBusy}
-                  className="cyt-gradient-bg inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold text-bg disabled:opacity-60"
-                >
-                  {pauseBusy ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Play size={16} strokeWidth={2.5} />
-                  )}
-                  Resume project
-                </button>
+                {/* Only the owner can resume; a collaborator just sees the state. */}
+                {!isCollaborator && (
+                  <button
+                    type="button"
+                    onClick={togglePause}
+                    disabled={pauseBusy}
+                    className="cyt-gradient-bg inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold text-bg disabled:opacity-60"
+                  >
+                    {pauseBusy ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Play size={16} strokeWidth={2.5} />
+                    )}
+                    Resume project
+                  </button>
+                )}
               </div>
             </Card>
           )}
@@ -504,21 +544,25 @@ export function ResearchDashboard({
             lines up with the Est. spend KPI tile on the left. */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 lg:mt-10">
-            {/* Start now → activate Winslow (orchestrator) for this topic. */}
-            <button
-              type="button"
-              onClick={startWinslow}
-              disabled={starting}
-              title="Activate Winslow — he plans the day and the crew fans out"
-              className="cyt-gradient-bg inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-bg transition-opacity disabled:opacity-60"
-            >
-              {starting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Zap size={14} strokeWidth={2.5} />
-              )}
-              {started ? "Winslow activated" : "Start now"}
-            </button>
+            {/* Start now → activate Winslow (orchestrator) for this topic. Owner-
+                only: triggering the orchestrator isn't on a collaborator's granted
+                surface, so hide it rather than surface a control that would fail. */}
+            {!isCollaborator && (
+              <button
+                type="button"
+                onClick={startWinslow}
+                disabled={starting}
+                title="Activate Winslow — he plans the day and the crew fans out"
+                className="cyt-gradient-bg inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-[13px] font-bold text-bg transition-opacity disabled:opacity-60"
+              >
+                {starting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Zap size={14} strokeWidth={2.5} />
+                )}
+                {started ? "Winslow activated" : "Start now"}
+              </button>
+            )}
             {/* Roadmap → the topic's priority-ordered work queue. */}
             <Link
               href={`/topic/${topicId}/roadmap`}

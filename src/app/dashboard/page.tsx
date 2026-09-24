@@ -17,6 +17,7 @@ import {
   Pause,
   Play,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -80,6 +81,19 @@ function PausedBadge() {
   );
 }
 
+/** Small pill marking a topic that was shared with the user (collaborator). */
+function SharedBadge({ modules }: { modules?: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-[#2a3350] bg-[#0f1626] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand"
+      title="Shared with you — you're a collaborator on this topic"
+    >
+      <Users size={12} />
+      Shared{typeof modules === "number" && modules > 0 ? ` · ${modules}` : ""}
+    </span>
+  );
+}
+
 function TopicCard({
   t,
   onToggle,
@@ -90,6 +104,9 @@ function TopicCard({
   busy: boolean;
 }) {
   const paused = t.paused;
+  // A shared (collaborator) topic isn't owned by this user — they can't pause it,
+  // and it carries a "Shared" badge instead of a pause control.
+  const shared = t.shared === true;
   const pct =
     t.tasks_total > 0
       ? Math.round((t.tasks_completed / t.tasks_total) * 100)
@@ -106,7 +123,10 @@ function TopicCard({
           <h3 className="truncate text-[16px] font-bold text-ink">{t.name}</h3>
           <p className="mt-1 line-clamp-2 text-[13px] text-mut">{t.topic}</p>
         </div>
-        {paused ? <PausedBadge /> : <StatusBadge status={t.status} />}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {shared && <SharedBadge modules={t.modules?.length} />}
+          {paused ? <PausedBadge /> : <StatusBadge status={t.status} />}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-4 text-[12px] text-dim">
@@ -132,35 +152,42 @@ function TopicCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        {/* Pause / Resume — toggles without following the card link. */}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggle(t);
-          }}
-          title={
-            paused
-              ? "Resume this project — restore the agents where they left off"
-              : "Pause this project — soft-shuts the agents down and saves their state"
-          }
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-60 ${
-            paused
-              ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
-              : "border-line bg-panel2 text-mut hover:text-ink"
-          }`}
-        >
-          {busy ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : paused ? (
-            <Play size={12} />
-          ) : (
-            <Pause size={12} />
-          )}
-          {paused ? "Resume" : "Pause"}
-        </button>
+        {/* Pause / Resume — owner-only; a shared (collaborator) topic shows a
+            passive "Collaborator" label instead of a control they can't use. */}
+        {shared ? (
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-dim">
+            <Users size={12} /> Collaborator
+          </span>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggle(t);
+            }}
+            title={
+              paused
+                ? "Resume this project — restore the agents where they left off"
+                : "Pause this project — soft-shuts the agents down and saves their state"
+            }
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-60 ${
+              paused
+                ? "border-[#1f3d2e] bg-[#0e1c16] text-good hover:brightness-125"
+                : "border-line bg-panel2 text-mut hover:text-ink"
+            }`}
+          >
+            {busy ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : paused ? (
+              <Play size={12} />
+            ) : (
+              <Pause size={12} />
+            )}
+            {paused ? "Resume" : "Pause"}
+          </button>
+        )}
 
         <span className="flex items-center text-[13px] text-brand opacity-0 transition-opacity group-hover:opacity-100">
           Open dashboard <ArrowRight size={14} className="ml-1" />
@@ -424,16 +451,57 @@ export default function DashboardPage() {
               <Loader2 size={16} className="animate-spin" /> Loading your topics…
             </div>
           ) : topics && topics.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {topics.map((t) => (
-                <TopicCard
-                  key={t.id}
-                  t={t}
-                  onToggle={togglePause}
-                  busy={busyId === t.id}
-                />
-              ))}
-            </div>
+            (() => {
+              // Split owned vs shared (collaborator) topics so a shared topic is
+              // reachable + clearly distinguished under its own "Shared with me"
+              // grouping. Owned topics keep the primary grid.
+              const owned = topics.filter((t) => !t.shared);
+              const shared = topics.filter((t) => t.shared);
+              return (
+                <div className="space-y-8">
+                  {owned.length > 0 && (
+                    <div>
+                      {shared.length > 0 && (
+                        <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wider text-dim">
+                          Your topics
+                        </h3>
+                      )}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {owned.map((t) => (
+                          <TopicCard
+                            key={t.id}
+                            t={t}
+                            onToggle={togglePause}
+                            busy={busyId === t.id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {shared.length > 0 && (
+                    <div>
+                      <h3 className="mb-1 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-dim">
+                        <Users size={13} /> Shared with me
+                      </h3>
+                      <p className="mb-3 text-[12px] text-dim">
+                        Topics others granted you collaborator access to — you see
+                        only the modules you were given.
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {shared.map((t) => (
+                          <TopicCard
+                            key={t.id}
+                            t={t}
+                            onToggle={togglePause}
+                            busy={busyId === t.id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           ) : (
             <div className="rounded-2xl border border-dashed border-line bg-panel/50 py-16 text-center">
               <FolderOpen size={28} className="mx-auto text-dim" />
