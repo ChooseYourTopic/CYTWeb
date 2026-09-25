@@ -1,67 +1,56 @@
 {
-  "updatedAt": "2026-09-23T16:00:00-05:00",
+  "updatedAt": "2026-09-24T12:00:00-05:00",
   "project": "ChooseYourTopic",
   "releases": [
     {
-      "date": "2026-09-23",
-      "version": "0.6.0",
-      "title": "Live orchestration status board + build log",
-      "highlights": [
-        "New internal /preview/status board — roadmap status (live / in-progress / waiting), the build queue, the enhancement backlog and a three-way reconcile watermark.",
-        "New /preview/releases build log (this page). Both read live box data files (roadmap.json / preview-releases.json) at request time via ROADMAP_DATA_PATH / RELEASES_DATA_PATH, so Winslow updates them with no redeploy.",
-        "Coexists with the existing product pages — the /preview product story, the customer /roadmap and /releases — which are unchanged."
-      ],
-      "notes": "The board reads a file mounted into the CYTWeb container; editing it on the box updates both pages instantly. Reconciled against GitHub main (CYTAPI f622f61 / CYTWeb 652d14f)."
+      "date": "2026-09-24",
+      "description": "The /preview/releases build log became the Change-Approval Board — a lighter applied-changelog where every entry is a date, a short description of the change, and a link to any knowledge article about it. Reads a live box data file so entries can be appended with no redeploy.",
+      "kbLink": null
     },
     {
       "date": "2026-09-23",
-      "version": "0.5.0",
-      "title": "API-key audit history + usage tracking (#3 C1 + C2)",
-      "highlights": [
-        "#3 C1 — generation history: each minted bridge key records issuer · date · name · scope, with a history list that includes revoked and expired keys (GET /me/bridge-keys/history + a CYTWeb issuance-history panel).",
-        "#3 C2 — usage tracking: each authenticated bridge call bumps use_count + last_used_at in one atomic keyed update (failed / revoked / expired keys never count); settings shows 'Last used <when> · N uses'."
-      ],
-      "notes": "CYTAPI PR #31 (de4db13) + #32 (f622f61); CYTWeb PR #22 (4ec53e6) + #23 (652d14f). Additive migrations, backup-first, verified in-browser on prod. #3 C3 (per-use activity log) remains."
+      "description": "Collaborator topic-navigation: collaborators now land on the topic(s) they're bound to, with module tabs hidden for anything they lack a grant on — a cleaner, permission-aware nav (#5 usability).",
+      "kbLink": null
     },
     {
       "date": "2026-09-23",
-      "version": "0.4.0",
-      "title": "Fine-grained module RBAC — complete (#5 C1+C2+C3)",
-      "highlights": [
-        "Role hierarchy admin > support > licensee > collaborator, with collaborators bound to a specific topic/license and granted per-module access (topic_collaborators + User::hasModuleGrant()).",
-        "Licensee grant/revoke UI with a per-module checkbox grid, gated behind a 2FA step-up.",
-        "Enforcement gate — every module gated by (role + topic binding + module grant), fail-closed; the license ACL is managed by owner + admin."
-      ],
-      "notes": "CYTAPI PR #27–#30 (main 8467b2f), CYTWeb PR #21. Entitlement resolves through licensing; verified in-browser on prod (collaborator finance 200 / build,ads 403; owner full; stranger 404)."
+      "description": "Per-key activity drill-in for bridge API keys (#3 C3): each key now has a per-use activity log you can open from settings, completing the audit-history trio (generation history + usage count + activity log).",
+      "kbLink": null
+    },
+    {
+      "date": "2026-09-23",
+      "description": "Shipped the live Winslow status board (/preview/status) and this build log (/preview/releases), both reading box data files (roadmap.json / preview-releases.json) at request time — so status and change updates appear with no redeploy.",
+      "kbLink": null
+    },
+    {
+      "date": "2026-09-23",
+      "description": "API-key usage tracking (#3 C2): every authenticated bridge call bumps a use-count + last-used timestamp in one atomic keyed update, surfaced in settings as 'Last used <when> · N uses'. Failed / revoked / expired keys never count.",
+      "kbLink": null
+    },
+    {
+      "date": "2026-09-23",
+      "description": "API-key generation history (#3 C1): each minted bridge key records issuer, date, name and scope, with a history list that includes revoked and expired keys.",
+      "kbLink": null
+    },
+    {
+      "date": "2026-09-23",
+      "description": "Fine-grained module RBAC went complete (#5 C1+C2+C3): role hierarchy admin > support > licensee > collaborator, a licensee grant/revoke per-module checkbox grid behind a 2FA step-up, and a fail-closed enforcement gate keyed on (role + topic binding + module grant).",
+      "kbLink": null
     },
     {
       "date": "2026-09-22",
-      "version": "0.3.0",
-      "title": "Connectivity hub + platform association (#2 + #4)",
-      "highlights": [
-        "Unified settings connectivity hub: multiple bridge/partner keys per consuming app plus AI-model provider keys (Claude · Grok · Gemini · OpenAI) with priority + default-model selection.",
-        "Every issued key/token is associated with a target platform picked from the integrations directory — 7 Empire products plus external QuickBooks/Zoho-style placeholders."
-      ],
-      "notes": "CYTWeb PR #20 (4accd3c), CYTAPI PR #26 (c60661f). All key issuance/reveal stays 2FA-gated (#1)."
+      "description": "Unified settings connectivity hub + platform association (#2 + #4): multiple bridge/partner keys per consuming app plus AI-model provider keys (Claude · Grok · Gemini · OpenAI) with priority and default-model selection, each key associated with a target platform from the integrations directory.",
+      "kbLink": null
     },
     {
       "date": "2026-09-22",
-      "version": "0.2.0",
-      "title": "2FA-gated key reveal + Empire Bridge provider",
-      "highlights": [
-        "2FA step-up required to reveal or mint a plaintext cyt_qb_ bridge key.",
-        "Empire Integration Bridge provider surface live — topic + customer + Winslow-orchestration record providers (roadmap · next-steps · context · activity), connected & live into QuickerBiz."
-      ]
+      "description": "2FA-gated key reveal + Empire Integration Bridge provider surface went live — topic, customer and Winslow-orchestration record providers (roadmap · next-steps · context · activity), connected and live into QuickerBiz.",
+      "kbLink": null
     },
     {
       "date": "2026-08-21",
-      "version": "0.1.0",
-      "title": "Multi-provider topic engine live",
-      "highlights": [
-        "The multi-provider AI model ladder: OpenAI + Grok/xAI + Gemini, per-(user,provider) key + priority, cascade-on-exhaustion. Gemini gemini-3.x-flash live + free at the top of the ladder.",
-        "One line → a living app: a Winslow-style crew (9 specialists + orchestrator) researches, builds, markets and runs a topic, surfaced in living dashboards.",
-        "ops-MCP — run the agent crew on your own Claude subscription ($0) or a metered API key."
-      ]
+      "description": "The multi-provider AI topic engine went live: an OpenAI + Grok/xAI + Gemini model ladder with per-(user, provider) keys and cascade-on-exhaustion (Gemini gemini-3.x-flash live and free at the top), plus the ops-MCP to run the agent crew on your own Claude subscription or a metered API key.",
+      "kbLink": null
     }
   ]
 }
