@@ -19,10 +19,12 @@ import {
   Search,
   RefreshCw,
   Inbox,
+  KeyRound,
 } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { VoiceInputButton } from "@/components/ui/VoiceInputButton";
 import { AdminTwoFactorChallenge } from "@/components/security/TwoFactor";
+import { CollaboratorManager } from "@/components/collaborators/CollaboratorManager";
 import {
   cytapi,
   ApiError,
@@ -105,13 +107,20 @@ function StatusChip({ s }: { s: TicketStatus }) {
 
 /* ------------------------------- shell / tabs ----------------------------- */
 
-type TabKey = "support" | "overview" | "users" | "companies" | "activity";
+type TabKey =
+  | "support"
+  | "overview"
+  | "users"
+  | "companies"
+  | "licenses"
+  | "activity";
 
 const TABS: { key: TabKey; label: string; Icon: typeof LifeBuoy }[] = [
   { key: "support", label: "Support queue", Icon: LifeBuoy },
   { key: "overview", label: "Overview", Icon: LayoutDashboard },
   { key: "users", label: "Users", Icon: Users },
   { key: "companies", label: "Companies", Icon: Building2 },
+  { key: "licenses", label: "License access", Icon: KeyRound },
   { key: "activity", label: "Activity", Icon: Activity },
 ];
 
@@ -228,6 +237,7 @@ export default function AdminPage() {
         {tab === "overview" && <OverviewTab />}
         {tab === "users" && <UsersTab isAdmin={isAdmin} />}
         {tab === "companies" && <CompaniesTab />}
+        {tab === "licenses" && <LicensesTab whoami={whoami} />}
         {tab === "activity" && <ActivityTab />}
       </div>
     </main>
@@ -1101,6 +1111,159 @@ function CompaniesTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ---------------------------- License access ------------------------------ */
+
+/**
+ * Staff (admin/support) ACL console — the browser surface for the license-ACL
+ * management the API widened to admin+support (#5). A staff member can FIND ANY
+ * license (topic), not just ones they own, and manage its collaborators:
+ *   • the picker is the cross-tenant company list (admin.companies() — staff-gated),
+ *     searchable by license name / topic / owner / id;
+ *   • the ACL is managed with the SAME shared <CollaboratorManager/> the licensee uses
+ *     in Settings — list, add-by-email, grant/revoke per-module.
+ * The server is the authority: TopicCollaboratorController::manageableLicense() authorizes
+ * staff on ANY license (owner|admin|support), the 2FA step-up gates grant/edit, and the
+ * no-privilege-escalation cap (User::canGrantRole) is enforced fail-closed. This tab is
+ * only reachable inside the already-staff-gated admin portal (a plain user can't sign in
+ * here at all), and the /admin nav link is itself staff-only.
+ */
+function LicensesTab({ whoami }: { whoami: StaffWhoami }) {
+  const [rows, setRows] = useState<AdminCompanyRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    cytapi.admin
+      .companies()
+      .then((res) => {
+        if (alive) setRows(res.data);
+      })
+      .catch(() => {
+        if (alive) setError("Couldn't load licenses.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const term = q.trim().toLowerCase();
+  const filtered = (rows ?? []).filter((c) => {
+    if (!term) return true;
+    return (
+      String(c.id) === term ||
+      (c.name ?? "").toLowerCase().includes(term) ||
+      (c.topic ?? "").toLowerCase().includes(term) ||
+      (c.owner?.name ?? "").toLowerCase().includes(term) ||
+      (c.owner?.email ?? "").toLowerCase().includes(term)
+    );
+  });
+
+  const selected = (rows ?? []).find((c) => c.id === selectedId) ?? null;
+
+  // Reflect the no-escalation rule in the UI: this surface only ever confers
+  // collaborator-level module access (the lowest tier), so any staff granter clears
+  // the cap — but staff/admin role changes are explicitly OUT of scope here and stay on
+  // the admin-only Users tab. The API enforces canGrantRole fail-closed regardless.
+  const roleLabel = whoami.is_admin ? "Administrator" : "Support agent";
+  const ceilingNote = (
+    <div className="flex items-start gap-2 rounded-xl border border-line bg-panel px-3.5 py-3 text-[12.5px] text-mut">
+      <ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand" />
+      <span>
+        You&apos;re managing this license as{" "}
+        <span className="font-semibold text-ink">{roleLabel}</span>. Grants here confer{" "}
+        <span className="font-semibold text-ink">collaborator-level module access</span>{" "}
+        only — the lowest tier. Per the no-escalation rule you cannot confer a support or
+        admin role from here
+        {whoami.is_admin
+          ? "; change staff roles on the Users tab."
+          : " — that stays an admin-only action on the Users tab."}{" "}
+        The server enforces this fail-closed.
+      </span>
+    </div>
+  );
+
+  if (rows == null && !error) return <PanelLoading label="Loading licenses…" />;
+  if (error) return <PanelError text={error} />;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      {/* LEFT: search + license picker (any license, not just owned) */}
+      <div className="rounded-2xl border border-line bg-panel p-4">
+        <div className="relative">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-dim"
+          />
+          <input
+            className="cyt-input pl-9"
+            placeholder="Search a license by name, topic, owner, or id…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="mt-3 max-h-[640px] space-y-2 overflow-y-auto pr-0.5">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-mut">
+              <Building2 size={22} className="text-dim" />
+              <p className="text-[13px]">No licenses match your search</p>
+            </div>
+          ) : (
+            filtered.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
+                className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                  c.id === selectedId
+                    ? "border-[#31384c] bg-panel2"
+                    : "border-line bg-panel2/40 hover:border-[#31384c]"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[13.5px] font-semibold text-ink">
+                    {c.name}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px] text-dim">#{c.id}</span>
+                </div>
+                <div className="mt-1 truncate text-[12px] text-mut">{c.topic ?? "—"}</div>
+                <div className="mt-1 truncate text-[11.5px] text-dim">
+                  Owner: {c.owner?.name ?? c.owner?.email ?? c.owner?.phone ?? "—"}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT: the selected license's collaborators (shared manager) */}
+      <div className="rounded-2xl border border-line bg-panel p-4">
+        {selected == null ? (
+          <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 text-mut">
+            <KeyRound size={26} className="text-dim" />
+            <p className="text-[14px]">Select a license to manage its collaborators</p>
+          </div>
+        ) : (
+          <>
+            <div className="border-b border-line pb-3">
+              <h2 className="text-[17px] font-bold tracking-[-0.3px] text-ink">
+                {selected.name}
+              </h2>
+              <p className="mt-0.5 text-[12px] text-mut">
+                License #{selected.id} · Owner{" "}
+                {selected.owner?.name ?? selected.owner?.email ?? "—"}
+              </p>
+            </div>
+            <div className="pt-4">
+              <CollaboratorManager topicId={selected.id} ceilingNote={ceilingNote} />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
